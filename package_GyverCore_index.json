@@ -302,7 +302,7 @@
             {"name": "ATmega328 based boards"}
           ],
           "toolsDependencies": []
-        },
+        }
       ],
       "tools": []
     }

@@ -264,40 +264,12 @@
 		{
           "name": "GyverCore",
           "architecture": "avr",
-          "version": "1.10.0_win64",
+          "version": "1.10.0",
           "category": "Contributed",
-          "url": "https://github.com/AlexGyver/GyverCore/releases/download/GyverCore-1.10.0/GyverCore_win64.zip",
-          "archiveFileName": "GyverCore_win64.zip",
+          "url": "https://github.com/AlexGyver/GyverCore/releases/download/GyverCore-1.10.0/GyverCore.zip",
+          "archiveFileName": "GyverCore.zip",
           "checksum": "MD5:c2fd5c8948373636be2529aa5439475f",
           "size": "59017145",
-          "boards": [
-            {"name": "ATmega328 based boards"}
-          ],
-          "toolsDependencies": []
-        },
-		{
-          "name": "GyverCore",
-          "architecture": "avr",
-          "version": "1.10.0_win32",
-          "category": "Contributed",
-          "url": "https://github.com/AlexGyver/GyverCore/releases/download/GyverCore-1.10.0/GyverCore_win32.zip",
-          "archiveFileName": "GyverCore_win32.zip",
-          "checksum": "MD5:4d505bc57bd1753786d708b050d3d465",
-          "size": "56714597",
-          "boards": [
-            {"name": "ATmega328 based boards"}
-          ],
-          "toolsDependencies": []
-        },
-		{
-          "name": "GyverCore",
-          "architecture": "avr",
-          "version": "1.10.0_linux",
-          "category": "Contributed",
-          "url": "https://github.com/AlexGyver/GyverCore/releases/download/GyverCore-1.10.0/GyverCore_linux.zip",
-          "archiveFileName": "GyverCore_linux.zip",
-          "checksum": "MD5:6b875bc5cad4c60a02884198e52cb52a",
-          "size": "63954944",
           "boards": [
             {"name": "ATmega328 based boards"}
           ],

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<input id='url' type='text' value='xmlhttp_info.txt'>
+<div id="demo">
+<button type="button" onclick="load()">Test</button>
+</div>
+
+<script>
+function load() {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("demo").innerHTML =
+      this.responseText;
+    }
+  };
+  xhttp.open("GET", document.getElementById("url").value, true);
+  xhttp.send();
+}
+</script>
+
+</body>
+</html>

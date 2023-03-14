@@ -2,24 +2,26 @@
 <html>
 <body>
 
-<input id='url' type='text' value='xmlhttp_info.txt'>
-<div id="demo">
-<button type="button" onclick="load()">Test</button>
-
-</div>
+<input type="file" id="input"/>
+<canvas width="400" height="300" id="canvas"/>
 
 <script>
-function load() {
-  /*var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      document.getElementById("demo").innerHTML =
-      this.responseText;
+var URL = window.webkitURL || window.URL;
+
+window.onload = function() {
+    var input = document.getElementById('input');
+    input.addEventListener('change', handleFiles, false);
+}
+
+function handleFiles(e) {
+    var ctx = document.getElementById('canvas').getContext('2d');
+    var url = URL.createObjectURL(e.target.files[0]);
+    var img = new Image();
+    img.onload = function() {
+        ctx.drawImage(img, 20, 20);    
     }
-  };
-  xhttp.open("GET", document.getElementById("url").value, true);
-  xhttp.send();*/
-  document.getElementById("demo").innerHTML = window.location;
+    img.src = url;
+    
 }
 </script>
 

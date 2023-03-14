@@ -2,27 +2,13 @@
 <html>
 <body>
 
-<input type="file" id="input"/>
-<canvas width="400" height="300" id="canvas"/>
-
+<label id='lbl'></label>
 <script>
-var URL = window.webkitURL || window.URL;
-
-window.onload = function() {
-    var input = document.getElementById('input');
-    input.addEventListener('change', handleFiles, false);
-}
-
-function handleFiles(e) {
-    var ctx = document.getElementById('canvas').getContext('2d');
-    var url = URL.createObjectURL(e.target.files[0]);
-    var img = new Image();
-    img.onload = function() {
-        ctx.drawImage(img, 20, 20);    
-    }
-    img.src = url;
-    
-}
+    let s = document.location.toString();
+    s = s.slice(s.indexOf('?') + 1);
+    bytes = window.atob(s);
+    let utf8Encode = new TextEncoder();
+    document.getElementById('lbl').innerHTML = utf8Encode.encode(bytes);
 </script>
 
 </body>

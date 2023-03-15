@@ -1,16 +1,17 @@
 // CONST
-const knitter = "https://alexgyver.github.io/GyverBraid/knitter.html?"
 const ui_offs = 250;
-const cv_d = 500;
+let cv_d = 600;
+
+// VARS
 let cv = [
   { x: ui_offs + cv_d / 2 + 50, y: 50 + cv_d / 2 },
   { x: ui_offs + cv_d + 100 + cv_d / 2, y: 50 + cv_d / 2 }
 ];
-
-// VARS
 var ui;
 let img = null;
 let nodes = [];
+let overlaps = []
+let length;
 
 let update_f = true;
 let node = 0;
@@ -23,20 +24,29 @@ function setup() {
   createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
   ui = QuickSettings.create(10, 10, "GyverBraid")
     .addFileChooser("Pick Image", "", "", handleFile)
-    .addRange('Width', cv_d - 200, cv_d + 200, cv_d, 1, update)
-    .addRange('Offset X', -200, 200, 0, 1, update)
-    .addRange('Offset Y', -200, 200, 0, 1, update)
+    //.addRange('Canvas', 300, 700, 500, 50, resize)
+    .addRange('Width', /*cv_d - 200*/0, cv_d + 200, cv_d, 1, update)
+    .addRange('Offset X', -cv_d / 2, cv_d / 2, 0, 1, update)
+    .addRange('Offset Y', -cv_d / 2, cv_d / 2, 0, 1, update)
     .addRange('Brightness', -128, 128, 0, 1, update)
     .addRange('Contrast', 0, 5.0, 1.0, 0.1, update)
-    .addRange('Node Amount', 50, 255, 100, 1, update)
+    .addRange('Node Amount', 100, 255, 200, 5, update)
     .addRange('Max Lines', 0, 2000, 500, 50, update)
-    .addRange('Clear W', 1.1, 3.0, 1.1, 0.1, update)
-    .addRange('Clear A', 0, 255, 255, 5, update)
-    .addButton('Trace', trace)
-    .addButton('Stop', stop)
+    .addRange('Diameter', 0, 100, 30, 1, update)
+    .addRange('Thickness', 0.1, 1.0, 0.5, 0.1, update)
+    .addRange('Clear W', 0.5, 3.0, 1.1, 0.1, update)
+    .addRange('Clear A', 0, 255, 200, 5, update)
+    .addRange('Offset', 0, 180, 45, 5, update)
+    .addRange('Overlaps', 0, 30, 30, 1, update)
+    //.addButton('Start', start)
+    .addHTML("Control",
+      "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
+      "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
+      "<button class='qs_button' onclick='template()'>Template</button>"
+      )
     .addHTML("Status", "Stop")
-    .addTextArea("Nodes", "")
-    .addTextArea("Nodes B64", "")
+    .addText("Nodes", "")
+    .addText("Nodes B64", "")
     .addButton('Knit!', knit)
     .setWidth(ui_offs - 10);
 
@@ -59,50 +69,71 @@ function draw() {
   if (running) tracer();
 }
 
-// =============== FUNC ===============
+// =============== TRACER ===============
 function tracer() {
   setStatus("Running. Lines: " + count);
+  let amount = ui_get("Node Amount");
   for (let i = 0; i < 10; i++) {
     let max = 0;
     best = -1;
 
-    if (count > ui_get('Max Lines')) {
-      count
-      setStatus("Done! " + count + " lines");
-      running = false;
-      ui_set("Nodes", nodes);
-      nodes.push(ui_get("Node Amount") & 0xff);
-      nodes.push(ui_get("Node Amount") >> 8);
-
-      let u8 = new Uint8Array(nodes);
-      var decoder = new TextDecoder('utf8');
-      ui_set("Nodes B64", btoa(nodes.map(function (v) { return String.fromCharCode(v) }).join('')));
-
-      nodes.pop();
-      nodes.pop();
-      return;
-    }
-
     loadPixels();
-    for (let i = 0; i < ui_get("Node Amount"); i++) {
+    for (let i = 0; i < amount; i++) {
+      let dst = abs(i - nodes[count - 1]);
+      if (dst > amount / 2) dst = amount - dst;
+      if (dst < 10) continue;
+
+      if (count >= 2) {
+        dst = abs(i - nodes[count - 2]);
+        if (dst > amount / 2) dst = amount - dst;
+        dst = dst / amount * 360;
+        if (dst < ui_get("Offset")) continue;
+      }
+
+      if (overlaps[i] + 1 > ui_get("Overlaps")) continue;
+
       let res = scanLine(node, i);
       if (res > max) {
         max = res;
         best = i;
       }
     }
+
+    overlaps[best]++;
+
+    if (count > ui_get('Max Lines') || best < 0) {
+      running = false;
+      count--;
+      setStatus("Done! " + count + " lines, " + Math.round(length / 100) + " m");
+
+      ui_set("Nodes", nodes);
+      nodes.push(amount & 0xff);
+      nodes.push((amount >> 8) & 0xff);
+
+      let u8 = new Uint8Array(nodes);
+      var decoder = new TextDecoder('utf8');
+      //ui_set("Nodes B64", btoa(nodes.map(function (v) { return String.fromCharCode(v) }).join('')));
+      ui_set("Nodes B64", btoa(String.fromCharCode.apply(null, new Uint8Array(nodes))));
+      nodes.pop();
+      nodes.pop();
+      return;
+    }
+
+
     nodes.push(best);
     updatePixels();
 
     let xy = [get_xy(0, node), get_xy(0, best)];
-    stroke(255, 255, 255, color(ui_get('Clear A')));
+    stroke(255, 255, 255, ui_get('Clear A'));
     strokeWeight(ui_get('Clear W'));
     line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
 
-    stroke(0);
-    strokeWeight(0.5);
+    stroke(0, 0, 0, 150);
+    strokeWeight(ui_get("Thickness") / ((ui_get("Diameter") * 10 / cv_d)));
+
     xy = [get_xy(1, node), get_xy(1, best)];
     line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
+    length += dist(xy[0].x, xy[0].y, xy[1].x, xy[1].y) * ui_get("Diameter") / (cv_d);
     node = best;
     count++;
   }
@@ -123,10 +154,12 @@ function scanLine(start, end) {
   let dy = abs(y1 - y0);
   let err = dx - dy;
   let e2 = 0;
+  let len = 0;
 
   while (1) {
     let i = (x0 + y0 * width) * 4;
     sum += 255 - pixels[i];
+    len++;
 
     if (x0 == x1 && y0 == y1) break;
     e2 = err * 2;
@@ -142,6 +175,7 @@ function scanLine(start, end) {
   return Math.round(sum);
 }
 
+// =============== MISC ===============
 function showImage() {
   if (img) {
     let img_x = cv[0].x + ui_get("Offset X");
@@ -172,7 +206,6 @@ function drawNodes() {
   }
 }
 
-// =============== FUNC ===============
 function get_xy(num, node) {
   let amount = ui_get("Node Amount");
   x = cv[num].x + cv_d / 2 * Math.cos(2 * Math.PI * node / amount);
@@ -187,22 +220,37 @@ function update() {
   update_f = true;
   running = false;
 }
-function trace() {
+/*function resize(val) {
+  cv_d = val;
+  cv = [
+    { x: ui_offs + cv_d / 2 + 50, y: 50 + cv_d / 2 },
+    { x: ui_offs + cv_d + 100 + cv_d / 2, y: 50 + cv_d / 2 }
+  ];
+  update_f = true;
+}*/
+function start() {
   node = 0;
   count = 1;
   nodes = [0];
+  overlaps = new Array(ui_get("Node Amount")).fill(0);
+  length = 0;
   update_f = true;
   running = true;
 }
 function stop() {
   running = false;
+  update_f = true;
 }
 function handleFile(file) {
   img = loadImage(URL.createObjectURL(file));
   update();
+  ui_set('Offset X', 0);
+  ui_set('Offset Y', 0);
+  ui_set('Brightness', 0);
+  ui_set('Contrast', 1);
 }
 function knit() {
-  window.open(knitter + ui_get("Nodes B64"), '_blank').focus();
+  window.open(document.location.toString().replace("index.html", "knitter.html?") + ui_get("Nodes B64"), '_blank').focus();
 }
 
 // =============== UTILITY ===============

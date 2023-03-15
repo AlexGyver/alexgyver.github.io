@@ -17,9 +17,14 @@
             color: white;
             border-radius: 20px;
         }
+        .cont{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
     </style>
 
-    <div align="center">
+    <div class="cont">
         <label id="list"></label>
         <h1>Knitter</h1>
         <canvas id="canvas" width="800" height="800"></canvas>
@@ -44,9 +49,9 @@
         cx.textBaseline = "middle";
 
         let W2 = cv.width / 2;
-        let R = W2 - 40;
+        let R = W2 - 30;
 
-        drawNums();
+        //drawNums();
         drawDots();
 
         cx.lineWidth = 1;
@@ -100,8 +105,8 @@
             cx.beginPath();
             cx.lineWidth = state ? 5 : 7;
             cx.strokeStyle = state ? "#000" : "#FFF";
-            let xy0 = getXY(node, R + 20 + (state ? 0 : -2));
-            let xy1 = getXY(node, R + 40 + (state ? 0 : 2));
+            let xy0 = getXY(node, R + 10 + (state ? 0 : -2));
+            let xy1 = getXY(node, R + 30 + (state ? 0 : 2));
             cx.moveTo(xy0.x, xy0.y);
             cx.lineTo(xy1.x, xy1.y);
             cx.stroke();
@@ -109,7 +114,8 @@
         function next() {
             if (!start) {
                 cx.clearRect(0, 0, cv.width, cv.height);
-                drawNums();
+                document.getElementById("next").innerHTML = "NEXT";
+                //drawNums();
                 drawDots();
                 start = true;
             }
@@ -117,13 +123,20 @@
 
             cx.beginPath();
             cx.arc(W2, W2, R-2, 0, 2 * Math.PI);
-            cx.fillStyle = "#ffffff88";
+            cx.fillStyle = "#ffffffaa";
             cx.fill();
 
-            
+            cx.beginPath();
+            cx.rect(W2-75, W2-50, 150, 100);
+            cx.fillStyle = "#ffffff";
+            cx.fill();
+
+            cx.font = "70px Arial";
+            cx.beginPath();
+            cx.fillStyle = "#000";
+            cx.fillText(lines[cur], W2, W2);
 
             arrow(cur, true);
-            document.getElementById("next").innerHTML = lines[cur];
             drawLine(cur, R-2);
             cur++;
         }

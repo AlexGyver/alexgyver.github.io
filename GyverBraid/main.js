@@ -22,32 +22,32 @@ let running = false;
 // =============== SETUP ===============
 function setup() {
   createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
-  ui = QuickSettings.create(10, 10, "GyverBraid")
+  ui = QuickSettings.create(0, 0, "GyverBraid")
     .addFileChooser("Pick Image", "", "", handleFile)
     //.addRange('Canvas', 300, 700, 500, 50, resize)
-    .addRange('Width', /*cv_d - 200*/0, cv_d + 200, cv_d, 1, update)
-    .addRange('Offset X', -cv_d / 2, cv_d / 2, 0, 1, update)
-    .addRange('Offset Y', -cv_d / 2, cv_d / 2, 0, 1, update)
-    .addRange('Brightness', -128, 128, 0, 1, update)
-    .addRange('Contrast', 0, 5.0, 1.0, 0.1, update)
-    .addRange('Node Amount', 100, 255, 200, 5, update)
-    .addRange('Max Lines', 0, 2000, 500, 50, update)
-    .addRange('Diameter', 0, 100, 30, 1, update)
-    .addRange('Thickness', 0.1, 1.0, 0.5, 0.1, update)
-    .addRange('Clear W', 0.5, 3.0, 1.1, 0.1, update)
-    .addRange('Clear A', 0, 255, 200, 5, update)
-    .addRange('Offset', 0, 180, 45, 5, update)
-    .addRange('Overlaps', 0, 30, 30, 1, update)
+    .addRange('Width', cv_d - 300, cv_d + 300, cv_d, 1, update_h)
+    .addRange('Offset X', -cv_d / 2, cv_d / 2, 0, 1, update_h)
+    .addRange('Offset Y', -cv_d / 2, cv_d / 2, 0, 1, update_h)
+    .addRange('Brightness', -128, 128, 0, 1, update_h)
+    .addRange('Contrast', 0, 5.0, 1.0, 0.1, update_h)
+    .addRange('Node Amount', 100, 255, 200, 5, update_h)
+    .addRange('Max Lines', 0, 2000, 500, 50, update_h)
+    .addRange('Diameter', 0, 100, 30, 1, update_h)
+    .addRange('Thickness', 0.1, 1.0, 0.5, 0.1, update_h)
+    .addRange('Clear W', 0.5, 3.0, 1.1, 0.1, update_h)
+    .addRange('Clear A', 0, 255, 200, 5, update_h)
+    .addRange('Offset', 0, 100, 45, 5, update_h)
+    .addRange('Overlaps', 1, 10, 5, 1, update_h)
     //.addButton('Start', start)
     .addHTML("Control",
       "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
       "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
-      "<button class='qs_button' onclick='template()'>Template</button>"
-      )
+      "<button class='qs_button' onclick='template()'>Template</button>&nbsp;" +
+      "<button class='qs_button' onclick='knit()'>Knit</button>"
+    )
     .addHTML("Status", "Stop")
     .addText("Nodes", "")
     .addText("Nodes B64", "")
-    .addButton('Knit!', knit)
     .setWidth(ui_offs - 10);
 
   imageMode(CENTER);
@@ -189,7 +189,6 @@ function showImage() {
     copy(show, 0, 0, show.width, show.height, img_x - show.width / 2, img_y - show.width / 2, show.width, show.height);
   }
 }
-
 function drawCanvas() {
   stroke(0);
   strokeWeight(1);
@@ -205,18 +204,20 @@ function drawNodes() {
     circle(xy.x, xy.y, 5);
   }
 }
-
 function get_xy(num, node) {
-  let amount = ui_get("Node Amount");
-  x = cv[num].x + cv_d / 2 * Math.cos(2 * Math.PI * node / amount);
-  y = cv[num].y + cv_d / 2 * Math.sin(2 * Math.PI * node / amount);
+  let xy = get_xy_raw(cv[num].x, cv[num].y, cv_d / 2, node, ui_get("Node Amount"));
+  return xy;
+}
+function get_xy_raw(x, y, r, cur, max) {
+  x = x + r * Math.cos(2 * Math.PI * cur / max);
+  y = y + r * Math.sin(2 * Math.PI * cur / max);
   x = Math.round(x);
   y = Math.round(y);
   return { x, y };
 }
 
 // =============== HANDLERS ===============
-function update() {
+function update_h() {
   update_f = true;
   running = false;
 }
@@ -243,14 +244,47 @@ function stop() {
 }
 function handleFile(file) {
   img = loadImage(URL.createObjectURL(file));
-  update();
+  update_h();
   ui_set('Offset X', 0);
   ui_set('Offset Y', 0);
   ui_set('Brightness', 0);
   ui_set('Contrast', 1);
 }
 function knit() {
-  window.open(document.location.toString().replace("index.html", "knitter.html?") + ui_get("Nodes B64"), '_blank').focus();
+  let s = document.location.toString();
+  if (s.indexOf("index.html") > 0) s = s.replace("index.html", "");
+  s += "knitter.html?" + ui_get("Nodes B64");
+  window.open(s, '_blank').focus();
+}
+function template() {
+  let size = 1500;
+  let pg = createGraphics(size, size);
+  pg.background(255);
+  pg.noStroke();
+  pg.fill(0);
+  pg.textAlign(CENTER, CENTER);
+  pg.textSize(20);
+  let am = ui_get('Node Amount');
+  for (let i = 0; i < am; i++) {
+    let xy = get_xy_raw(size / 2, size / 2, size / 2 - 60, i, am);
+    pg.circle(xy.x, xy.y, 5);
+    //xy = get_xy_raw(size / 2, size / 2, size / 2 - 20, i, am);
+    //pg.text(i, xy.x, xy.y);
+  }
+  for (let i = 0; i < am; i++) {
+    pg.push();
+    pg.translate(size/2,size/2);
+    if (i < am / 4 || i > am * 3 / 4) {
+      pg.rotate(radians(360 * i / am));
+      pg.text(i, size/2-30, 0);
+    } else {
+      pg.rotate(radians(360 * i / am + 180));
+      pg.text(i, -(size/2-30), 0);
+    }
+    pg.pop();
+  }
+  image(pg,0,0);
+  save(pg, "template.png");
 }
 
 // =============== UTILITY ===============

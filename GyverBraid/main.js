@@ -1,4 +1,5 @@
 // CONST
+const knitter = "https://alexgyver.github.io/GyverBraid/knitter.html?"
 const ui_offs = 250;
 const cv_d = 500;
 let cv = [
@@ -75,7 +76,7 @@ function tracer() {
 
       let u8 = new Uint8Array(nodes);
       var decoder = new TextDecoder('utf8');
-      ui_set("Nodes B64", btoa(nodes.map(function(v){return String.fromCharCode(v)}).join('')));
+      ui_set("Nodes B64", btoa(nodes.map(function (v) { return String.fromCharCode(v) }).join('')));
 
       nodes.pop();
       nodes.pop();
@@ -201,7 +202,7 @@ function handleFile(file) {
   update();
 }
 function knit() {
-  window.open("http://127.0.0.1:5500/knitter.html?"+ui_get("Nodes B64"), '_blank').focus();
+  window.open(knitter + ui_get("Nodes B64"), '_blank').focus();
 }
 
 // =============== UTILITY ===============

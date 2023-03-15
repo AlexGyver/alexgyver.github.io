@@ -1,9 +1,52 @@
 <html>
-  <body>
-    <h1>AlexGyver.github.io</h1>
-    <ul>
-      <li><a href="/processing/jsTest.html">Cool js animation</a></li>
-      <li><a href="/GyverBraid/">GyverBraid</a></li>
-    </ul>
-  </body>
+
+<body>
+    <style>
+
+        body {
+            font-family: 'Consolas';
+            background: repeating-linear-gradient(-45deg,
+                    #f0f0f0,
+                    #f0f0f0 20px,
+                    #e6e6e6 20px,
+                    #e6e6e6 40px);
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: auto;
+            max-width: 500px;
+        }
+
+        span {
+            cursor: pointer;
+            display: block;
+            width: 200px;
+            padding: 10px;
+            margin: 5px;
+            background-color: rgb(0, 194, 0);
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        span:hover {
+            background-color: rgb(0, 167, 0);
+        }
+
+        a {
+            text-decoration: none;
+            color: rgb(0, 0, 0);
+            font-size: 23px;
+        }
+    </style>
+    <div class="container">
+        <h1>AlexGyver.github.io</h1>
+        <span><a href="/GyverBraid/">GyverBraid</a></span>
+        <span><a href="/processing/jsTest.html">JS animation</a></span>
+    </div>
+</body>
+
 </html>

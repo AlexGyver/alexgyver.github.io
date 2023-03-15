@@ -7,17 +7,7 @@
 
 <body>
     <style>
-        .btn {
-            width: 250px;
-            height: 120px;
-            font-size: 50px;
-            background-color: rgb(0, 161, 0);
-            border: none;
-            font-weight: bold;
-            color: white;
-            border-radius: 20px;
-        }
-        .cont{
+        .cont {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -27,11 +17,7 @@
     <div class="cont">
         <label id="list"></label>
         <h1>Knitter</h1>
-        <canvas id="canvas" width="800" height="800"></canvas>
-
-        <br><br>
-
-        <button id="next" class="btn" onclick="next()">START</button>
+        <canvas onclick="next()" id="canvas" width="800" height="800"></canvas>
     </div>
 
     <script>
@@ -51,13 +37,17 @@
         let W2 = cv.width / 2;
         let R = W2 - 30;
 
-        //drawNums();
         drawDots();
 
         cx.lineWidth = 1;
         cx.strokeStyle = "#0005";
         for (let i = 1; i < lines.length; i++) drawLine(i);
         cx.strokeStyle = "#000";
+
+        cx.font = "80px Arial";
+        cx.beginPath();
+        cx.fillStyle = "#fff";
+        cx.fillText("START", W2, W2);
 
         function drawNums() {
             cx.font = "12px Arial";
@@ -68,6 +58,7 @@
                 cx.fillText(i, xy.x, xy.y);
             }
         }
+
         function drawLine(node) {
             cx.lineWidth = 1;
             cx.strokeStyle = "#000";
@@ -114,12 +105,13 @@
         function next() {
             if (!start) {
                 cx.clearRect(0, 0, cv.width, cv.height);
-                document.getElementById("next").innerHTML = "NEXT";
                 //drawNums();
                 drawDots();
                 start = true;
             }
             arrow(cur - 1, false);
+            arrow(cur, true);
+            
 
             cx.beginPath();
             cx.arc(W2, W2, R-2, 0, 2 * Math.PI);
@@ -127,16 +119,15 @@
             cx.fill();
 
             cx.beginPath();
-            cx.rect(W2-75, W2-50, 150, 100);
+            cx.rect(W2-80, W2-60, 160, 100);
             cx.fillStyle = "#ffffff";
             cx.fill();
 
-            cx.font = "70px Arial";
+            cx.font = "80px Arial";
             cx.beginPath();
             cx.fillStyle = "#000";
             cx.fillText(lines[cur], W2, W2);
 
-            arrow(cur, true);
             drawLine(cur, R-2);
             cur++;
         }

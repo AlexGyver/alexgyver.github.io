@@ -78,12 +78,12 @@
       ortho(-width / 2, width / 2, -height / 2, height / 2, 10, 2000);
       amx = Math.ceil(width / bsize + 1);
       amy = Math.ceil(height / bsize + 1)
-      boxes = new Array(amx * amy).fill(10);
+      boxes = new Array(amx * amy).fill(400);
       fill(110);
     }
 
     function draw() {
-      //orbitControl();
+      orbitControl();
       background(100);
       directionalLight(255, 255, 255, -PI*0.3, PI*0.3, -PI*0.6);
       translate(0,-10,250);
@@ -92,7 +92,12 @@
 
       for (let x = 0; x < width + bsize; x += bsize) {
         for (let y = 0; y < height + bsize; y += bsize) {
+
           let h = noise(frameCount * 0.01, x / width * 10, y / height * 10) * 10 * 25;
+          /*let xx = x/bsize;
+          let yy = y/bsize;
+          h = 400 + 200 * sin(sqrt(xx*xx+yy*yy)/1 + frameCount*0.03);*/
+
           let offs = -35;
           if (mouseX + offs >= x - bsize / 2 && mouseX + offs <= x + bsize / 2 &&
             mouseY + offs >= y - bsize / 2 && mouseY + offs <= y + bsize / 2) {

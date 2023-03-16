@@ -2,7 +2,7 @@
 
 <head>
   <meta charset="UTF-8">
-  //<meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
 </head>
 
@@ -13,24 +13,26 @@
     right: 0;
     margin-left: auto;
     margin-right: auto;
-    width: 400px;
+    max-width: 400px;
+    width: auto;
     top: 100px;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding-bottom: 20px;
-    background-color: rgba(0, 0, 0, 0.247);
+    background-color: rgba(0, 0, 0, 0.404);
     border-radius: 10px;
   }
 
   h1 {
     color: white;
-    font-size: 30px;
+    font-size: 28px;
   }
 
   body {
     font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
     background-color: rgb(100, 100, 100);
+    margin: 0;
   }
 
   span {
@@ -68,7 +70,7 @@
     let bsize = 60;
     let amx, amy;
     function setup() {
-      createCanvas(windowWidth - 15, windowHeight - 15, WEBGL);
+      createCanvas(windowWidth, windowHeight, WEBGL);
       stroke(0, 0, 0, 200);
       strokeWeight(0.5);
       
@@ -81,9 +83,9 @@
     }
 
     function draw() {
+      //orbitControl();
       background(100);
       directionalLight(255, 255, 255, -PI*0.3, PI*0.3, -PI*0.6);
-      orbitControl();
       translate(0,-10,250);
       rotateX(-0.2);
       rotateY(0.2);

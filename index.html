@@ -1,55 +1,113 @@
 <html>
+
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body {
-            font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
-            background: repeating-linear-gradient(
-                    -45deg,
-                    #f0f0f0,
-                    #f0f0f0 20px,
-                    #e6e6e6 20px,
-                    #e6e6e6 40px);
-        }
-
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: auto;
-            max-width: 500px;
-        }
-
-        span {
-            cursor: pointer;
-            display: block;
-            width: 200px;
-            padding: 10px;
-            margin: 5px;
-            background-color: rgb(0, 194, 0);
-            border-radius: 5px;
-            text-align: center;
-            font-weight: bold;
-        }
-
-        span:hover {
-            background-color: rgb(0, 167, 0);
-        }
-
-        a {
-            text-decoration: none;
-            color: rgb(0, 0, 0);
-            font-size: 23px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
 </head>
 
-<body>
-    <div class="container">
-        <h1>AlexGyver.github.io</h1>
-        <span><a href="/GyverBraid/">GyverBraid</a></span>
-        <span><a href="/processing/jsTest.html">JS animation</a></span>
-    </div>
+<style>
+  .cont {
+    position: absolute;
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    width: 400px;
+    top: 100px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 20px;
+    background-color: rgba(0, 0, 0, 0.247);
+    border-radius: 10px;
+  }
+
+  h1 {
+    color: white;
+    font-size: 30px;
+  }
+
+  body {
+    font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
+    background-color: rgb(100, 100, 100);
+  }
+
+  span {
+    cursor: pointer;
+    display: block;
+    width: 200px;
+    padding: 10px;
+    margin: 5px;
+    background-color: rgb(0, 194, 0);
+    border-radius: 5px;
+    text-align: center;
+    font-weight: bold;
+  }
+
+  span:hover {
+    background-color: rgb(0, 155, 0);
+  }
+
+  a {
+    text-decoration: none;
+    color: rgb(0, 0, 0);
+    font-size: 23px;
+  }
+</style>
+
+<body style="background-color:rgb(100,100,100)">
+  <div class="cont">
+    <h1>AlexGyver.github.io</h1>
+    <span><a href="/GyverBraid/">GyverBraid</a></span>
+    <span><a href="https://alexgyver.ru">alexgyver.ru</a></span>
+  </div>
+  
+  <script>
+    let boxes = [];
+    let bsize = 60;
+    let amx, amy;
+    function setup() {
+      createCanvas(windowWidth - 15, windowHeight - 15, WEBGL);
+      stroke(0, 0, 0, 200);
+      strokeWeight(0.5);
+      
+      rectMode(CENTER);
+      ortho(-width / 2, width / 2, -height / 2, height / 2, 10, 2000);
+      amx = Math.ceil(width / bsize + 1);
+      amy = Math.ceil(height / bsize + 1)
+      boxes = new Array(amx * amy).fill(10);
+      fill(110);
+    }
+
+    function draw() {
+      background(100);
+      directionalLight(255, 255, 255, -PI*0.3, PI*0.3, -PI*0.6);
+      orbitControl();
+      translate(0,-10,250);
+      rotateX(-0.2);
+      rotateY(0.2);
+
+      for (let x = 0; x < width + bsize; x += bsize) {
+        for (let y = 0; y < height + bsize; y += bsize) {
+          let h = noise(frameCount * 0.01, x / width * 10, y / height * 10) * 10 * 25;
+          let offs = -35;
+          if (mouseX + offs >= x - bsize / 2 && mouseX + offs <= x + bsize / 2 &&
+            mouseY + offs >= y - bsize / 2 && mouseY + offs <= y + bsize / 2) {
+            h = 400;
+          }
+          let idx = Math.round(x / bsize + (width / bsize) * (y / bsize));
+          let k = boxes[idx] < h ? 0.4 : 0.02;
+          boxes[idx] += (h - boxes[idx]) * k;
+          push();
+          translate(-width / 2 + x, -height / 2 + y);
+          box(bsize, bsize, boxes[idx]);
+          pop();
+        }
+      }
+    }
+  </script>
+
 </body>
 
 </html>

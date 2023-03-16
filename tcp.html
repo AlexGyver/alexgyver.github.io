@@ -1,0 +1,12 @@
+<html>
+  <body>
+    <script>
+      let xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function() {
+        console.log(xhr.responseText);
+      }
+      xhr.open("GET", "http://192.168.1.214/test");
+      xhr.send();
+    </script>
+  </body>
+</html>

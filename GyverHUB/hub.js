@@ -3,40 +3,75 @@ let mq_client;
 let mqtt_state = false;
 let devices;
 let focused = null;
-let cfg = { 'darkmode': false, 'net_id': 'MyDevices', 'use_tcp': false, 'tcp_ip': '', 'tcp_port': 50000, 'use_mqtt': false, 'mq_host': '', 'mq_port': '', 'mq_login': '', 'mq_pass': '' };
+let find_flag = false;
+let cfg = { 'darkmode': true, 'net_id': 'MyDevices', 'use_tcp': false, 'tcp_ip': '', 'tcp_port': 50000, 'use_mqtt': false, 'mq_host': '', 'mq_port': '', 'mq_login': '', 'mq_pass': '' };
 const theme = [
-  ['#202122', '#2b2b2c', '#eee', '#ccc', '#1b1c1d'],
+  ['#202122', '#2d2d31', '#eee', '#ccc', '#1b1c1d'],
   ['#eee', '#fff', '#111', '#333', '#ddd']
 ];  // back/tab/font/font2/dark
 
 load_cfg();
-//scan();
+scan();
 
+// =============== UI ===============
 function toggle_cfg() {
   let cfg_s = getEl('cfg').style;
   let dev_s = getEl('devices').style;
-  if (cfg_s.display == 'block') {
+  let ctrl_s = getEl('controls').style;
+  if (cfg_s.display == 'block') {    // close cfg
     cfg_s.display = 'none';
     dev_s.display = 'block';
     save_cfg();
     if (!cfg.use_mqtt) spinColor(0);
     scan();
-  } else {
+  } else {                          // open cfg
+    focused = null;
+    closeControls();
     cfg_s.display = 'block';
     dev_s.display = 'none';
+    ctrl_s.display = 'none';
     if (mqtt_state) {
       mqtt_state = false;
       mq_client.end();
     }
   }
 }
+function closeControls() {
+  focused = null;
+  getEl('title').innerHTML = 'GyverHUB';
+  getEl('devices').style.display = 'block';
+  getEl('controls').style.display = 'none';
+  getEl('back').style.display = 'none';
+}
 
+// ============= SENDERS =============
+function postPress(id, name, value) {
+  post(id, 'GH_press?' + name + '=' + value);
+}
+function postClick(id, name, value) {
+  post(id, 'GH_click?' + name + '=' + value);
+}
+function postUpdate() {
+}
 function scan() {
-  console.log('update...');
-  getEl('devices').innerHTML = "";
-  devices = [];
-  if (cfg.use_mqtt) mq_start();
-  if (cfg.use_tcp) scan_tcp();
+  if (focused) {
+    if (devices[focused].mqtt) mq_send(cfg.net_id + '/' + devices[focused].dev_id, cfg.net_id);
+    else tcp_send(focused, cfg.net_id);
+  } else {
+    getEl('devices').innerHTML = "";
+    devices = [];
+    if (cfg.use_mqtt) {
+      mq_start();
+      find_flag = true;
+    }
+    mq_send(cfg.net_id, cfg.net_id);
+    if (cfg.use_tcp) scan_tcp();
+  }
+}
+
+function post(id, cmd) {
+  if (devices[id].mqtt) mq_send(cfg.net_id + '/' + id, cmd);
+  else tcp_send(id, cmd);
 }
 
 // ============ MQTT =============
@@ -64,14 +99,16 @@ function mq_start() {
 
   if (!mqtt_state) {
     mq_client = mqtt.connect(url, options);
-    console.log('connect...');
   }
 
   mq_client.on('connect', function () {
-    console.log('connected');
     mqtt_state = true;
     mq_client.subscribe(cfg.net_id + '_app');
     spinColor(1);
+    if (find_flag) {
+      find_flag = false;
+      mq_send(cfg.net_id, cfg.net_id);
+    }
   });
 
   mq_client.on('error', function (err) {
@@ -138,6 +175,7 @@ function spinColor(val) {
   document.querySelector(':root').style.setProperty('--spin', cols[val]);
 }
 
+// ================ TCP ===============
 function scan_tcp() {
   let ip = document.getElementById("tcp_ip").value;
   let port = document.getElementById("tcp_port").value;
@@ -145,13 +183,15 @@ function scan_tcp() {
   ip = ip_a[0] + '.' + ip_a[1] + '.' + ip_a[2] + '.';
 
   for (let i = 1; i < 255; i++) {
-    let xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function () {
-      if (this.readyState == 4 && this.status == 200) parse(this.responseText);
-    }
-    xhr.timeout = 2000;
-    xhr.open("GET", "http://" + ip + i + ":" + port + "/" + cfg.net_id);
-    xhr.send();
+    setTimeout(() => {
+      let xhr = new XMLHttpRequest();
+      xhr.onreadystatechange = function () {
+        if (this.readyState == 4 && this.status == 200) parse(this.responseText);
+      }
+      xhr.timeout = 2000;
+      xhr.open("GET", "http://" + ip + i + ":" + port + "/" + cfg.net_id);
+      xhr.send();
+    }, 10);
   }
 }
 function update_ip() {
@@ -159,6 +199,16 @@ function update_ip() {
     if (ip.indexOf("local") > 0) alert('Disable WEB RTC anonymizer');
     else document.getElementById("tcp_ip").value = ip;
   });
+}
+function tcp_send(id, cmd) {
+  let xhr = new XMLHttpRequest();
+  xhr.onreadystatechange = function () {
+    if (this.readyState == 4 && this.status == 200) parse(this.responseText);
+  }
+  xhr.timeout = 2000;
+  xhr.open("GET", "http://" + devices[id].ip + ":" + cfg.tcp_port + "/" + cmd);
+
+  xhr.send();
 }
 function genID() {
   document.getElementById("net_id").value = "HUB_" + Math.round(Math.random() * 0xffffff).toString(16);
@@ -209,6 +259,6 @@ function getLocalIP() {
     };
     rtc.createOffer(function (offerDesc) {
       rtc.setLocalDescription(offerDesc);
-    }, function (e) { console.warn("offer failed", e); });
+    }, function (e) { return; });
   });
 }

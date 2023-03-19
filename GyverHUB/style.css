@@ -31,6 +31,11 @@ body {
   font-weight: bold;
 }
 
+.title_row {
+  display: flex;
+  margin-left: 10px;
+}
+
 .icon {
   font-weight: bold;
   font-family: 'Font Awesome 5 Free';
@@ -46,6 +51,10 @@ body {
   filter: brightness(0.9);
 }
 
+.head_btns {
+  margin-right: 10px;
+}
+
 .spin {
   color: var(--spin);
 }
@@ -58,7 +67,7 @@ body {
   margin: auto;
   width: auto;
   max-width: 400px;
-  padding: 0px 10px;
+  /*padding: 0px 10px;*/
 }
 
 /* =================================== */
@@ -74,22 +83,18 @@ body {
   flex-direction: column;
   align-items: center;
   background-color: var(--tab);
-  padding: 15px;
-  border-radius: 10px;
+  border-radius: 0px 0px 15px 15px;
   box-shadow: 0 0 10px 0px #00000030;
   font-size: 18px;
   font-weight: 500;
-  margin: 15px 0;
   color: var(--font2);
 }
-
 
 .cfg_row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 10px 0;
-  width: 100%;
+  margin: 20px 20px;
 }
 
 .cfg_inp_row {
@@ -105,12 +110,9 @@ body {
 }
 
 .cfg_head {
-  display: flex;
-  justify-content: space-between;
   font-size: 22px;
   font-weight: 600;
   color: var(--font);
-  margin: 10px 0;
 }
 
 .cfg_inp {
@@ -171,14 +173,15 @@ body {
   margin: 10px 0;
 }
 
-.cfg_in p {
-  font-size: 14px;
+.cfg_in span {
+  font-size: 15px;
 }
 
 /* =================================== */
 /* ============= DEVICE ============== */
 /* =================================== */
-#devices {
+#devices,
+#controls {
   width: 100%;
   color: var(--font);
 }
@@ -190,7 +193,7 @@ body {
   height: 45px;
   border-radius: 10px;
   box-shadow: 0 0 10px 0px #00000030;
-  margin: 15px 0;
+  margin: 15px 10px;
   padding: 15px;
   cursor: pointer;
 }
@@ -309,7 +312,6 @@ input:checked+.slider:before {
   -webkit-box-sizing: border-box;
   -moz-box-sizing: border-box;
   box-sizing: border-box;
-  padding-left: 15px;
 }
 
 .qs_range:focus {
@@ -439,11 +441,12 @@ input:checked+.slider:before {
 
 .control_nob {
   background: none;
+  justify-content: space-around;
 }
 
 .c_title {
   color: var(--font2);
-  font-size: 22px;
+  font-size: 25px;
   font-weight: 500;
 }
 
@@ -471,6 +474,7 @@ input:checked+.slider:before {
   background: var(--back);
   padding: 8px;
   border-radius: 6px;
+  margin-left: 15px;
 }
 
 .c_col {
@@ -541,9 +545,4 @@ img.colorpick-eyedropper-input-trigger {
 
 .tab_act {
   color: var(--prim) !important;
-}
-
-.d_divider {
-  height: 2px;
-  background: var(--dark);
 }

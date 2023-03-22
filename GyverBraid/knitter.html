@@ -22,7 +22,6 @@
 
         .inp {
             font-size: 30px;
-            width: 150px;
             margin: 0px 10px;
             height: 100%;
             align-items: center;
@@ -30,11 +29,16 @@
             justify-content: center;
             border-radius: 5px;
             padding: 0px;
+            min-width: 100px;
+        }
+        .text {
+            min-width: 100px;
         }
 
         .ctrl_row {
             margin: 5px 10px;
-            width: 400px;
+            width: 100%;
+            max-width: 400px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -65,7 +69,7 @@
 
         <div class="gray_row">
             <div class="ctrl_row">
-                <input type="number" class="inp" id="current">
+                <input type="number" class="inp text" id="current">
                 <label class="inp" id="percent">0</label>
                 <button class="inp" onclick="cur=Number(current.value);next()">SET</button>
             </div>
@@ -79,7 +83,7 @@
                 <label style="font-size:30px;margin-left:10px" id="range_lbl">4</label>
             </div>
             <div class="ctrl_row">
-                <input class="inp" type="text" class="" id="linedata" style="width:300px">
+                <input class="inp text" type="text" id="linedata" style="width:300px">
                 <button class="inp" onclick="load()">LOAD</button>
             </div>
         </div>

@@ -63,7 +63,7 @@ function setup() {
     .setDraggable(false)
     .setCollapsible(false);
 
-
+  ui.hideControl('Thickness');
   ui.hideControl('Edges');
   ui.hideControl('Threshold');
   ui.hideControl('Subtract');
@@ -159,7 +159,8 @@ function tracer() {
     }
 
     stroke(0, 0, 0, 150);
-    strokeWeight(ui_get("Thickness") / ((ui_get("Diameter") * 10 / cv_d)));
+    strokeWeight(0.5);
+    //strokeWeight(ui_get("Thickness") / ((ui_get("Diameter") * 10 / cv_d)));
 
     xy = [get_xy(1, node), get_xy(1, best)];
     line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);

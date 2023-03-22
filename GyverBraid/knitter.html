@@ -21,7 +21,7 @@
         }
 
         .inp {
-            font-size: 40px;
+            font-size: 30px;
             width: 150px;
             margin: 0px 10px;
             height: 100%;
@@ -33,12 +33,12 @@
         }
 
         .ctrl_row {
-            margin: 10px 10px;
-            width: 500px;
+            margin: 5px 10px;
+            width: 400px;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 65px;
+            height: 50px;
         }
 
         .gray_row {
@@ -56,6 +56,11 @@
 
     <div class="cont">
 
+        <div class="ctrl_row">
+            <input type="range" id="size_range" style="width:100%" min="300" max="1000" value="600"
+                oninput="cv.width=this.value;cv.height=this.value;load();">
+        </div>
+
         <canvas onclick="next()" id="canvas" width="600" height="600"></canvas>
 
         <div class="gray_row">
@@ -66,10 +71,10 @@
             </div>
             <div class="ctrl_row">
                 <button class="inp" id="auto_start">▶</button>
-                <button class="inp" id="auto_stop">⏹︎</button>
+                <button class="inp" id="auto_stop">◼️️</button>
             </div>
             <div class="ctrl_row">
-                <input type="range" id="prd_range" style="width:100%" min="1" max="9" value="4"
+                <input type="range" id="prd_range" style="width:90%" min="1" max="9" value="4"
                     oninput="range_lbl.innerHTML=this.value" onchange="if(timer){stopTmr();startTmr();}">
                 <label style="font-size:30px;margin-left:10px" id="range_lbl">4</label>
             </div>
@@ -112,6 +117,8 @@
         }, false);
 
         function load() {
+            W2 = cv.width / 2;
+            R = W2 - 30;
             cur = 0;
             try {
                 lines = atob(linedata.value).split('').map(function (v) { return v.codePointAt(0) });

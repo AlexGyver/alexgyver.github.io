@@ -1,7 +1,7 @@
 function setup() {
   createCanvas(600, 600, SVG);
-  strokeWeight(0.35);
-  stroke(0);
+  strokeWeight(0.3);
+  stroke(0, 0, 0, 170);
   noFill();
 }
 

@@ -41,7 +41,7 @@ function setup() {
     .addRange('Thickness', 0.1, 1.0, 0.5, 0.1, update_h)
     .addRange('Node Amount', 100, 255, 200, 5, update_h)
 
-    .addRange('Max Lines', 0, 2000, 1500, 50, update_h)
+    .addRange('Max Lines', 0, 5000, 1500, 50, update_h)
     .addRange('Threshold', 0, 2000, 0, 100, update_h)
 
     .addRange('Clear Width', 0.5, 5, 3, 0.5, update_h)

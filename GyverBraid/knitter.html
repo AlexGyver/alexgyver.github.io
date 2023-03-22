@@ -21,7 +21,7 @@
         }
 
         .inp {
-            font-size: 30px;
+            font-size: 25px;
             margin: 0px 10px;
             height: 100%;
             align-items: center;
@@ -36,13 +36,13 @@
         }
 
         .ctrl_row {
-            margin: 5px 10px;
+            margin: 3px 10px;
             width: 100%;
             max-width: 400px;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 50px;
+            height: 40px;
         }
 
         .gray_row {
@@ -50,7 +50,7 @@
             background: gray;
             width: 100%;
             justify-content: center;
-            padding: 20px 0px;
+            padding: 10px 0px;
             flex-direction: column;
             align-items: center;
             position: absolute;
@@ -80,7 +80,7 @@
             <div class="ctrl_row">
                 <input type="range" id="prd_range" style="width:90%" min="1" max="9" value="4"
                     oninput="range_lbl.innerHTML=this.value" onchange="if(timer){stopTmr();startTmr();}">
-                <label style="font-size:30px;margin-left:10px" id="range_lbl">4</label>
+                <label style="font-size:25px;margin-left:10px" id="range_lbl">4</label>
             </div>
             <div class="ctrl_row">
                 <input class="inp text" type="text" id="linedata" style="width:300px">

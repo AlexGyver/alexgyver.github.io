@@ -12,6 +12,7 @@
             -khtml-user-select: none;
             user-select: none;
             margin: 0;
+            padding: 0;
         }
 
         .cont {
@@ -90,6 +91,7 @@
     </div>
 
     <script>
+        let scale = 1.0;
         let lines;
         let amount = 0;
         let start = false;
@@ -121,6 +123,7 @@
         }, false);
 
         function load() {
+            scale = cv.width / 600;
             W2 = cv.width / 2;
             R = W2 - 30;
             cur = 0;
@@ -217,25 +220,25 @@
             cx.fill();
 
             cx.beginPath();
-            cx.rect(W2 - 90, W2 - 55, 180, 100);
-            cx.rect(W2 - 60, W2 - 150, 120, 80);
-            cx.rect(W2 - 60, W2 + 60, 120, 80);
+            cx.rect(W2 - 90*scale, W2 - 55*scale, 180*scale, 100*scale);
+            cx.rect(W2 - 60*scale, W2 - 150*scale, 120*scale, 80*scale);
+            cx.rect(W2 - 60*scale, W2 + 60*scale, 120*scale, 80*scale);
             cx.fillStyle = "#ffffff";
             cx.fill();
 
             cx.beginPath();
-            cx.rect(W2 - 100, W2 - 55, 200, 100);
+            cx.rect(W2 - 100*scale, W2 - 55*scale, 200*scale, 100*scale);
             cx.strokeStyle = "#000";
             cx.stroke();
 
-            cx.font = "100px Arial";
+            cx.font = 100*scale + "px Arial";
             cx.beginPath();
             cx.fillStyle = "#000";
             cx.fillText(lines[cur], W2, W2);
-            cx.font = "70px Arial";
+            cx.font = 70*scale + "px Arial";
             cx.fillStyle = "#aaa";
-            cx.fillText((cur > 0) ? lines[cur - 1] : '', W2, W2 + 100);
-            cx.fillText(lines[cur + 1], W2, W2 - 100);
+            cx.fillText((cur > 0) ? lines[cur - 1] : '', W2, W2 + 100*scale);
+            cx.fillText(lines[cur + 1], W2, W2 - 100*scale);
 
             drawLine(cur, R - 2);
             current.value = cur;

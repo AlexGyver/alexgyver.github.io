@@ -1,6 +1,6 @@
 // CONST
 const ui_offs = 250;
-let cv_d = 700;
+let cv_d = 600;
 
 // VARS
 let cv = [
@@ -63,7 +63,7 @@ function setup() {
     .setDraggable(false)
     .setCollapsible(false);
 
-  ui.hideControl('Thickness');
+
   ui.hideControl('Edges');
   ui.hideControl('Threshold');
   ui.hideControl('Subtract');

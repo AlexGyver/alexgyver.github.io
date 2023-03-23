@@ -544,15 +544,19 @@ function b_and_c(input, bright, cont) {
 
     let r = input.pixels[i];
     let g = input.pixels[i + 1];
+    let b = input.pixels[i + 2];
 
     r = (r * cont + bright);
     g = (g * cont + bright);
+    b = (b * cont + bright);
 
     r = r < 0 ? 0 : r > 255 ? 255 : r;
     g = g < 0 ? 0 : g > 255 ? 255 : g;
+    b = b < 0 ? 0 : b > 255 ? 255 : b;
 
     input.pixels[i] = r;
     input.pixels[i + 1] = g;
+    input.pixels[i + 2] = b;
   }
   input.updatePixels();
 }

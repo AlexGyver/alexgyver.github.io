@@ -36,7 +36,6 @@ function setup() {
     .addRange('Contrast', 0, 5.0, 1.0, 0.1, update_h)
     .addBoolean('Edges', 0, update_h)
 
-    .addRange('Diameter', 10, 100, 30, 0.1, update_h)
     .addNumber('Diameter', 10, 100, 30, 0.1, update_h)
     .addRange('Thickness', 0.1, 1.0, 0.5, 0.1, update_h)
     .addRange('Node Amount', 100, 255, 200, 5, update_h)

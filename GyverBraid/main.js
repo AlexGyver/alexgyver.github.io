@@ -1,3 +1,10 @@
+// GyverBraid Core
+
+// Огромное спасибо:
+// copych
+// alfedukovich
+// cybernetlab
+
 // CONST
 const ui_offs = 250;
 let cv_d = 650;
@@ -12,6 +19,7 @@ let img = null;
 let nodes = [];
 let overlaps = []
 let length;
+let density = 1;
 
 let update_f = true;
 let node = 0;
@@ -28,8 +36,14 @@ let offs_bx = 0, offs_by = 0;
 
 // =============== SETUP ===============
 function setup() {
-  createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
-  ui = QuickSettings.create(0, 0, "GyverBraid v1.1")
+  //createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
+  // auto zoom
+  let cWidth = ui_offs + cv_d * 2 + 50 * 3;
+  let cHeight = cv_d + 100;
+  document.body.style.zoom = (Math.min((innerHeight - 25) / cHeight, (innerWidth - 25) / cWidth)).toFixed(1);
+  createCanvas(cWidth, cHeight);
+
+  ui = QuickSettings.create(0, 0, "GyverBraid v1.2")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
@@ -41,13 +55,15 @@ function setup() {
     .addRange('Node Amount', 100, 255, 200, 5, update_h)
 
     .addRange('Max Lines', 0, 5000, 1500, 50, update_h)
-    .addRange('Threshold', 0, 2000, 0, 100, update_h)
+    .addRange('Threshold', 0, 2000, 0, 0, update_h)
 
     .addRange('Clear Width', 0.5, 5, 3, 0.5, update_h)
     .addRange('Clear Alpha', 0, 255, 20, 5, update_h)
     .addBoolean('Subtract', 1, update_h)
     .addRange('Offset', 0, 100, 10, 5, update_h)
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
+    .addBoolean('Negative', 0, update_h)
+    .addBoolean('Center Balance', 0, update_h)
     .addHTML("Control",
       "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
       "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
@@ -102,9 +118,9 @@ function tracer() {
   setStatus("Running. Lines: " + count);
   let amount = ui_get("Node Amount");
   for (let i = 0; i < 10; i++) {
-    let max = -10000000000;
+    let max = 0;
     best = -1;
-    
+
     loadPixels();
     for (let i = 1; i < amount; i++) {
       let dst = abs(i - nodes[count - 1]);
@@ -129,7 +145,7 @@ function tracer() {
 
     overlaps[best]++;
 
-    if (count > ui_get('Max Lines') || best < 0 || stop_f) {
+    if (count > ui_get('Max Lines') || best < 0 || /*max < ui_get('Threshold') || */stop_f) {
       running = false;
       count--;
       setStatus("Done! " + count + " lines, " + Math.round(length / 100) + " m");
@@ -188,7 +204,23 @@ function scanLine(start, end) {
 
   while (1) {
     let i = getPixelIndex(x0, y0);
-    sum += (255 - pixels[i]) - (255 - pixels[i+3]);
+    let val;
+
+    if (ui_get('Negative')) {
+      val = (255 - pixels[i]) - (255 - pixels[i + 3]);
+    } else {
+      val = 255 - pixels[i];
+    }
+
+    if (ui_get('Center Balance')) {
+      let cx = abs(cv[0].x - x0);
+      let cy = abs(cv[0].y - y0);
+      let cl = Math.sqrt(cx * cx + cy * cy);
+      val *= Math.log(cv_d / 2 / cl);
+    }
+
+    sum += val;
+
     len++;
 
     if (x0 == x1 && y0 == y1) break;
@@ -233,19 +265,26 @@ function clearLine(xy, w, a) {
 
     while (1) {
       let i = getPixelIndex(x0, y0);
-      if (pixels[i] + a < 255) {
-        pixels[i] += a;
-        pixels[i+1] += a;
-        pixels[i+2] += a;
-      } else {
-        const ra = a - (255 - pixels[i]);
-        pixels[i] = 255;
-        pixels[i+1] = 255;
-        pixels[i+2] = 255;
-        pixels[i+3] -= ra;
-        if (pixels[i+3] < 0 ) {
-          pixels[i+3] = 0;
+
+      if (ui_get('Negative')) {
+        if (pixels[i] + a < 255) {
+          pixels[i] += a;
+          pixels[i + 1] += a;
+          pixels[i + 2] += a;
+        } else {
+          const ra = a - (255 - pixels[i]);
+          pixels[i] = 255;
+          pixels[i + 1] = 255;
+          pixels[i + 2] = 255;
+          pixels[i + 3] -= ra;
+          if (pixels[i + 3] < 0) {
+            pixels[i + 3] = 0;
+          }
         }
+      } else {
+        pixels[i] += a;
+        pixels[i + 1] += a;
+        pixels[i + 2] += a;
       }
 
       if (x0 == x1 && y0 == y1) break;

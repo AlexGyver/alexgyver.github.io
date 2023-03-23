@@ -7,7 +7,7 @@ let cv = [
   { x: ui_offs + cv_d / 2 + 50, y: 50 + cv_d / 2 },
   { x: ui_offs + cv_d + 100 + cv_d / 2, y: 50 + cv_d / 2 }
 ];
-var ui;
+let ui;
 let img = null;
 let nodes = [];
 let overlaps = []
@@ -100,7 +100,7 @@ function tracer() {
   setStatus("Running. Lines: " + count);
   let amount = ui_get("Node Amount");
   for (let i = 0; i < 10; i++) {
-    let max = 0;
+    let max = -10000000000;
     best = -1;
     
     loadPixels();
@@ -127,7 +127,7 @@ function tracer() {
 
     overlaps[best]++;
 
-    if (count > ui_get('Max Lines') || best < 0 || max < ui_get('Threshold') || stop_f) {
+    if (count > ui_get('Max Lines') || best < 0 || stop_f) {
       running = false;
       count--;
       setStatus("Done! " + count + " lines, " + Math.round(length / 100) + " m");
@@ -186,7 +186,7 @@ function scanLine(start, end) {
 
   while (1) {
     let i = (x0 + y0 * width) * 4;
-    sum += 255 - pixels[i];
+    sum += (255 - pixels[i]) - (255 - pixels[i+2]);
     len++;
 
     if (x0 == x1 && y0 == y1) break;
@@ -200,6 +200,7 @@ function scanLine(start, end) {
       y0 += sy;
     }
   }
+
   return Math.round(sum);
 }
 function clearLine(xy, w, a) {
@@ -230,9 +231,19 @@ function clearLine(xy, w, a) {
 
     while (1) {
       let i = (x0 + y0 * width) * 4;
-      pixels[i] += a;
-      pixels[i + 1] += a;
-      pixels[i + 2] += a;
+      if (pixels[i] + a <= 255) {
+        pixels[i] += a;
+        pixels[i+1] += a;
+      } else {
+        const ra = a - (255 - pixels[i]);
+        pixels[i] = 255;
+        pixels[i+1] -= ra;
+        pixels[i+2] -= ra;
+        if (pixels[i+1] < 0 ) {
+          pixels[i+1] = 0;
+          pixels[i+2] = 0;
+        }
+      }
 
       if (x0 == x1 && y0 == y1) break;
       e2 = err * 2;
@@ -264,6 +275,7 @@ function showImage() {
     let show = createImage(img.width, img.height);
     show.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
     show.filter(GRAY);
+    blue_pic(show)
     show.resize(ui_get("Size"), 0);
     b_and_c(show, ui_get("Brightness"), ui_get("Contrast"));
     //if (ui_get('Edges') && !hold_f) edges(show);
@@ -334,14 +346,6 @@ function update_h() {
   update_f = true;
   running = false;
 }
-/*function resize(val) {
-  cv_d = val;
-  cv = [
-    { x: ui_offs + cv_d / 2 + 50, y: 50 + cv_d / 2 },
-    { x: ui_offs + cv_d + 100 + cv_d / 2, y: 50 + cv_d / 2 }
-  ];
-  update_f = true;
-}*/
 function start() {
   node = 0;
   count = 1;
@@ -527,19 +531,25 @@ function b_and_c(input, bright, cont) {
 
     let r = input.pixels[i];
     let g = input.pixels[i + 1];
-    let b = input.pixels[i + 2];
 
     r = (r * cont + bright);
     g = (g * cont + bright);
-    b = (b * cont + bright);
 
     r = r < 0 ? 0 : r > 255 ? 255 : r;
     g = g < 0 ? 0 : g > 255 ? 255 : g;
-    b = b < 0 ? 0 : b > 255 ? 255 : b;
 
     input.pixels[i] = r;
     input.pixels[i + 1] = g;
-    input.pixels[i + 2] = b;
+  }
+  input.updatePixels();
+}
+function blue_pic(input) {
+  let w = input.width;
+  let h = input.height;
+
+  input.loadPixels();
+  for (let i = 0; i < w * h * 4; i += 4) {
+    input.pixels[i + 2] = 255;
   }
   input.updatePixels();
 }

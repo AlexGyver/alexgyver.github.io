@@ -2,7 +2,31 @@
 <html>
 
 <head>
+    <title>GyverBraid Knitter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="favicon.svg">
+    <link href="https://use.fontawesome.com/releases/v6.3.0/css/all.css" rel="stylesheet">
+    
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function (m, e, t, r, i, k, a) {
+            m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+            m[i].l = 1 * new Date();
+            for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+            k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+        })
+            (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+        ym(92861520, "init", {
+            clickmap: true,
+            trackLinks: true,
+            accurateTrackBounce: true
+        });
+    </script>
+    <noscript>
+        <div><img src="https://mc.yandex.ru/watch/92861520" style="position:absolute; left:-9999px;" alt="" /></div>
+    </noscript>
+    <!-- /Yandex.Metrika counter -->
 </head>
 
 <body>
@@ -32,6 +56,7 @@
             padding: 0px;
             min-width: 100px;
         }
+
         .text {
             min-width: 100px;
         }
@@ -220,25 +245,25 @@
             cx.fill();
 
             cx.beginPath();
-            cx.rect(W2 - 90*scale, W2 - 55*scale, 180*scale, 100*scale);
-            cx.rect(W2 - 60*scale, W2 - 150*scale, 120*scale, 80*scale);
-            cx.rect(W2 - 60*scale, W2 + 60*scale, 120*scale, 80*scale);
+            cx.rect(W2 - 90 * scale, W2 - 55 * scale, 180 * scale, 100 * scale);
+            cx.rect(W2 - 60 * scale, W2 - 150 * scale, 120 * scale, 80 * scale);
+            cx.rect(W2 - 60 * scale, W2 + 60 * scale, 120 * scale, 80 * scale);
             cx.fillStyle = "#ffffff";
             cx.fill();
 
             cx.beginPath();
-            cx.rect(W2 - 100*scale, W2 - 55*scale, 200*scale, 100*scale);
+            cx.rect(W2 - 100 * scale, W2 - 55 * scale, 200 * scale, 100 * scale);
             cx.strokeStyle = "#000";
             cx.stroke();
 
-            cx.font = 100*scale + "px Arial";
+            cx.font = 100 * scale + "px Arial";
             cx.beginPath();
             cx.fillStyle = "#000";
             cx.fillText(lines[cur], W2, W2);
-            cx.font = 70*scale + "px Arial";
+            cx.font = 70 * scale + "px Arial";
             cx.fillStyle = "#aaa";
-            cx.fillText((cur > 0) ? lines[cur - 1] : '', W2, W2 + 100*scale);
-            cx.fillText(lines[cur + 1], W2, W2 - 100*scale);
+            cx.fillText((cur > 0) ? lines[cur - 1] : '', W2, W2 + 100 * scale);
+            cx.fillText(lines[cur + 1], W2, W2 - 100 * scale);
 
             drawLine(cur, R - 2);
             current.value = cur;

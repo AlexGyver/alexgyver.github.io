@@ -64,6 +64,7 @@ function setup() {
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
     .addBoolean('Negative', 0, update_h)
     .addBoolean('Center Balance', 0, update_h)
+    .addBoolean('Quarter', 0, update_h)
     .addHTML("Control",
       "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
       "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
@@ -122,6 +123,10 @@ function tracer() {
     best = -1;
 
     loadPixels();
+
+    const left_limit = node - amount / 8;
+    const right_limit = node + amount / 8;
+
     for (let i = 1; i < amount; i++) {
       let dst = abs(i - nodes[count - 1]);
       if (dst > amount / 2) dst = amount - dst;
@@ -133,7 +138,19 @@ function tracer() {
         dst = dst / amount * 360;
         if (dst < ui_get("Offset")) continue;
 
-        if ( i >= abs(node - (amount / 4) / 2 ) && i <= abs(node + (amount / 4) / 2 ) ) continue;
+        if (ui_get("Quarter")) {
+          if (left_limit < 0) {
+            if ( (i >= 0 && i <= right_limit) || (i >= amount + left_limit && i <= amount) ) {
+              continue;
+            }
+          } else if (right_limit > amount) {
+            if ( (i >= left_limit && i <= amount) || (i >= 0 && i <= right_limit - amount) ) {
+              continue;
+            }
+          } else if (i >= left_limit && i <= right_limit) {
+            continue;
+          }
+        }
       }
 
       if (ui_get("Overlaps") > 0 && overlaps[i] + 1 > ui_get("Overlaps")) continue;

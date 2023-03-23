@@ -26,6 +26,8 @@ let start_x, start_y;
 let offs_x = 0, offs_y = 0;
 let offs_bx = 0, offs_by = 0;
 
+let density = 1;
+
 // =============== SETUP ===============
 function setup() {
   createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
@@ -70,6 +72,8 @@ function setup() {
 
   imageMode(CENTER);
   ellipseMode(CENTER);
+
+  density = pixelDensity();
 }
 
 // =============== MAIN LOOP ===============
@@ -186,8 +190,8 @@ function scanLine(start, end) {
   let len = 0;
 
   while (1) {
-    let i = (x0 + y0 * width) * 4;
-    sum += 255 - pixels[i];
+    let idx = getPixelIndex(x0, y0);
+    sum += 255 - pixels[idx];
     len++;
 
     if (x0 == x1 && y0 == y1) break;
@@ -230,10 +234,10 @@ function clearLine(xy, w, a) {
     let e2 = 0;
 
     while (1) {
-      let i = (x0 + y0 * width) * 4;
-      pixels[i] += a;
-      pixels[i + 1] += a;
-      pixels[i + 2] += a;
+      let idx = getPixelIndex(x0, y0);
+      pixels[idx] += a;
+      pixels[idx + 1] += a;
+      pixels[idx + 2] += a;
 
       if (x0 == x1 && y0 == y1) break;
       e2 = err * 2;
@@ -250,6 +254,9 @@ function clearLine(xy, w, a) {
 }
 
 // =============== MISC ===============
+function getPixelIndex(x, y) {
+  return (x + y * width * density) * 4 * density;
+}
 function cropImage() {
   noStroke();
   fill(255);

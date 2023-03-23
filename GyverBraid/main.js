@@ -29,9 +29,13 @@ let offs_bx = 0, offs_by = 0;
 
 // =============== SETUP ===============
 function setup() {
-  createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
-  cbox= select('meta[name=viewport]');
-cbox.attribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0');
+  let cWidth = ui_offs + cv_d * 2 + 50 * 3;
+  let cHeight = cv_d + 100;
+  let body = document.body;
+  let html = document.documentElement;
+  let wHeight = Math.max( body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight );
+  html.style.zoom = wHeight / cHeight; 
+  createCanvas(cWidth, cHeight);
   ui = QuickSettings.create(0, 0, "GyverBraid v1.1")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)

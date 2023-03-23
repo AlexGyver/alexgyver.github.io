@@ -188,7 +188,7 @@ function scanLine(start, end) {
 
   while (1) {
     let i = getPixelIndex(x0, y0);
-    sum += (255 - pixels[i]) - (255 - pixels[i+2]);
+    sum += (255 - pixels[i]) - (255 - pixels[i+3]);
     len++;
 
     if (x0 == x1 && y0 == y1) break;
@@ -233,17 +233,18 @@ function clearLine(xy, w, a) {
 
     while (1) {
       let i = getPixelIndex(x0, y0);
-      if (pixels[i] + a <= 255) {
+      if (pixels[i] + a < 255) {
         pixels[i] += a;
         pixels[i+1] += a;
+        pixels[i+2] += a;
       } else {
         const ra = a - (255 - pixels[i]);
         pixels[i] = 255;
-        pixels[i+1] -= ra;
-        pixels[i+2] -= ra;
-        if (pixels[i+1] < 0 ) {
-          pixels[i+1] = 0;
-          pixels[i+2] = 0;
+        pixels[i+1] = 255;
+        pixels[i+2] = 255;
+        pixels[i+3] -= ra;
+        if (pixels[i+3] < 0 ) {
+          pixels[i+3] = 0;
         }
       }
 
@@ -277,7 +278,6 @@ function showImage() {
     let show = createImage(img.width, img.height);
     show.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
     show.filter(GRAY);
-    blue_pic(show)
     show.resize(ui_get("Size"), 0);
     b_and_c(show, ui_get("Brightness"), ui_get("Contrast"));
     //if (ui_get('Edges') && !hold_f) edges(show);
@@ -553,16 +553,6 @@ function b_and_c(input, bright, cont) {
 
     input.pixels[i] = r;
     input.pixels[i + 1] = g;
-  }
-  input.updatePixels();
-}
-function blue_pic(input) {
-  let w = input.width;
-  let h = input.height;
-
-  input.loadPixels();
-  for (let i = 0; i < w * h * 4; i += 4) {
-    input.pixels[i + 2] = 255;
   }
   input.updatePixels();
 }

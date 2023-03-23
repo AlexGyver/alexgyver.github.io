@@ -26,8 +26,20 @@ let start_x, start_y;
 let offs_x = 0, offs_y = 0;
 let offs_bx = 0, offs_by = 0;
 
+/**
+ * from alexiss: при оценке веса линии (scanLine/clearLine) просто осветлять
+ * точку недостаточно. необходимо так же запоминать под каким углом уже
+ * проходила нить через данную точку. И, если под этим углом (с определённым
+ * допуском) нить уже проходила, то цвет в данной точке не учитывается.
+ * Массив radialFill содержит углы, под которыми через каждую точку проходила
+ * нить. Все 180 градусов делятся на 32 бита (или меньше) и каждый бит отвечает
+ * за 180/32 = 5.6 градусов. В clearLine для всех точек линии проставляется
+ * в 1 бит того угла, под которым проходит нить, а в scanLine если бит угла
+ * нити установлен в 1 цвет данной точки не учитывается
+ */
 let radialFill = [];
-let radialGranularity = 32;
+
+let density = 1;
 
 // =============== SETUP ===============
 function setup() {
@@ -52,6 +64,7 @@ function setup() {
     .addBoolean('Subtract', 1, update_h)
     .addRange('Offset', 0, 100, 10, 5, update_h)
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
+    .addRange('Radial Granularity', 0, 32, 32, 1, update_h)
     .addHTML("Control",
       "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
       "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
@@ -73,6 +86,8 @@ function setup() {
 
   imageMode(CENTER);
   ellipseMode(CENTER);
+
+  density = pixelDensity();
 }
 
 // =============== MAIN LOOP ===============
@@ -103,6 +118,7 @@ function draw() {
 function tracer() {
   setStatus("Running. Lines: " + count);
   let amount = ui_get("Node Amount");
+  let radialGranularity = ui_get("Radial Granularity");
   for (let i = 0; i < 10; i++) {
     let max = 0;
     best = -1;
@@ -121,7 +137,7 @@ function tracer() {
       }
 
       if (ui_get("Overlaps") > 0 && overlaps[i] + 1 > ui_get("Overlaps")) continue;
-      let res = scanLine(node, i);
+      let res = scanLine(node, i, radialGranularity);
 
       if (res > max) {
         max = res;
@@ -151,15 +167,15 @@ function tracer() {
 
     let xy = [get_xy(0, node), get_xy(0, best)];
 
-    /*if (!ui_get('Subtract')) {
+    if (!ui_get('Subtract')) {
       updatePixels();
       stroke(255, 255, 255, ui_get('Clear Alpha'));
       strokeWeight(ui_get('Clear Width'));
       line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
-    } else {*/
-      clearLine(xy, ui_get('Clear Width'), ui_get('Clear Alpha'));
+    } else {
+      clearLine(xy, ui_get('Clear Width'), ui_get('Clear Alpha'), radialGranularity);
       updatePixels();
-    //}
+    }
 
     stroke(0, 0, 0, 150);
     strokeWeight(ui_get("Thickness") / ((ui_get("Diameter") * 10 / cv_d)));
@@ -171,7 +187,7 @@ function tracer() {
     count++;
   }
 }
-function scanLine(start, end) {
+function scanLine(start, end, radialGranularity) {
   let xy = [get_xy(0, start), get_xy(0, end)];
 
   let x0 = xy[0].x;
@@ -186,13 +202,13 @@ function scanLine(start, end) {
   let dy = abs(y1 - y0);
   let err = dx - dy;
   let e2 = 0;
-  let len = Math.sqrt(dx * dx + dy * dy);
-  let radialMask = getRadialMask(x0, y0, x1, y1);
+  let len = 0;//Math.sqrt(dx * dx + dy * dy);
+  let radialMask = getRadialMask(x0, y0, x1, y1, radialGranularity);
 
   while (1) {
-    let i = (x0 + y0 * width) * 4;
-    if (((radialFill[i] || 0) & radialMask) == 0) {
-      sum += 255 - pixels[i];
+    let idx = getPixelIndex(x0, y0);
+    if (radialMask == 0 || ((radialFill[idx] || 0) & radialMask) == 0) {
+      sum += 255 - pixels[idx];
     }
     len++;
 
@@ -207,9 +223,9 @@ function scanLine(start, end) {
       y0 += sy;
     }
   }
-  return Math.round(sum * len);
+  return Math.round(sum / len);
 }
-function clearLine(xy, w, a) {
+function clearLine(xy, w, a, radialGranularity) {
   for (let i = 0; i < w; i++) {
     let x0 = xy[0].x;
     let y0 = xy[0].y;
@@ -234,14 +250,14 @@ function clearLine(xy, w, a) {
     let dy = abs(y1 - y0);
     let err = dx - dy;
     let e2 = 0;
-    let radialMask = getRadialMask(x0, y0, x1, y1);
+    let radialMask = getRadialMask(x0, y0, x1, y1, radialGranularity);
 
     while (1) {
-      let n = (x0 + y0 * width) * 4;
-      radialFill[n] = (radialFill[n] || 0) | radialMask;
-      pixels[n] += a;
-      pixels[n + 1] += a;
-      pixels[n + 2] += a;
+      let idx = getPixelIndex(x0, y0);
+      radialFill[idx] = (radialFill[idx] || 0) | radialMask;
+      pixels[idx] += a;
+      pixels[idx + 1] += a;
+      pixels[idx + 2] += a;
 
       if (x0 == x1 && y0 == y1) break;
       e2 = err * 2;
@@ -258,6 +274,9 @@ function clearLine(xy, w, a) {
 }
 
 // =============== MISC ===============
+function getPixelIndex(x, y) {
+  return (x + y * width * density) * 4 * density;
+}
 function cropImage() {
   noStroke();
   fill(255);
@@ -309,7 +328,8 @@ function get_xy_raw(x, y, r, cur, max) {
   y = Math.round(y);
   return { x, y };
 }
-function getRadialMask(x0, y0, x1, y1) {
+function getRadialMask(x0, y0, x1, y1, radialGranularity) {
+  if (radialGranularity <= 0) return 0;
   let angle = x1 == x0 ? (y0 < y1 ? 1 : -1) : Math.atan((y1 - y0) / (x1 - x0));
   let radialAngle = Math.round((angle + Math.PI / 2) * radialGranularity / Math.PI);
   return 1 << radialAngle;

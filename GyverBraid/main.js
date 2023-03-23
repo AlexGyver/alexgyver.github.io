@@ -193,7 +193,7 @@ function scanLine(start, end) {
 
   while (1) {
     let i = getPixelIndex(x0, y0);
-    sum += 127 - pixels[i];
+    sum += 200 - pixels[i];
     len++;
 
     if (x0 == x1 && y0 == y1) break;

@@ -202,7 +202,7 @@ function scanLine(start, end, radialGranularity) {
   let dy = abs(y1 - y0);
   let err = dx - dy;
   let e2 = 0;
-  let len = 0;//Math.sqrt(dx * dx + dy * dy);
+  let len = 0;
   let radialMask = getRadialMask(x0, y0, x1, y1, radialGranularity);
 
   while (1) {

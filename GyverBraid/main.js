@@ -7,7 +7,7 @@ let cv = [
   { x: ui_offs + cv_d / 2 + 50, y: 50 + cv_d / 2 },
   { x: ui_offs + cv_d + 100 + cv_d / 2, y: 50 + cv_d / 2 }
 ];
-var ui;
+let ui;
 let img = null;
 let nodes = [];
 let overlaps = []
@@ -471,7 +471,7 @@ function svg() {
 
 // =============== UTILITY ===============
 function getPixelIndex(x, y) {
-  return (x + y * width * density) * 4 * density;
+  return Math.round((x + y * width * density) * 4 * density);
 }
 function edges(eimg) {
   let kernel = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]];

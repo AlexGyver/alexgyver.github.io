@@ -132,6 +132,8 @@ function tracer() {
         if (dst > amount / 2) dst = amount - dst;
         dst = dst / amount * 360;
         if (dst < ui_get("Offset")) continue;
+
+        if ( i >= abs(node - (amount / 4) / 2 ) && i <= abs(node + (amount / 4) / 2 ) ) continue;
       }
 
       if (ui_get("Overlaps") > 0 && overlaps[i] + 1 > ui_get("Overlaps")) continue;

@@ -41,7 +41,7 @@ function setup() {
     .addRange('Thickness', 0.1, 1.0, 0.5, 0.1, update_h)
     .addRange('Node Amount', 100, 255, 200, 5, update_h)
 
-    .addRange('Max Lines', 0, 5000, 1500, 50, update_h)
+    .addRange('Max Lines', 0, 5000, 2000, 50, update_h)
     .addRange('Threshold', 0, 2000, 0, 100, update_h)
 
     .addRange('Clear Width', 0.5, 5, 3, 0.5, update_h)
@@ -49,6 +49,7 @@ function setup() {
     .addBoolean('Subtract', 1, update_h)
     .addRange('Offset', 0, 100, 10, 5, update_h)
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
+    .addBoolean('Center Balance', 0, update_h)
     .addHTML("Control",
       "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
       "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
@@ -188,8 +189,19 @@ function scanLine(start, end) {
   let len = 0;
 
   while (1) {
-    let i = getPixelIndex(x0, y0);
-    sum += 255 - pixels[i];
+    let idx = getPixelIndex(x0, y0);
+
+    let centerK = 1.0;
+
+    if (ui_get('Center Balance')) {
+      let cx = abs(cv[0].x - x0);
+      let cy = abs(cv[0].y - y0);
+      let cl = Math.sqrt(cx * cx + cy * cy);
+      centerK = Math.log(cv_d / 2 / cl);
+      // centerK = cv_d / 2 / cl;
+    }
+
+    sum += centerK * (255 - pixels[idx]);
     len++;
 
     if (x0 == x1 && y0 == y1) break;
@@ -233,10 +245,10 @@ function clearLine(xy, w, a) {
     let e2 = 0;
 
     while (1) {
-      let i = getPixelIndex(x0, y0);
-      pixels[i] += a;
-      pixels[i + 1] += a;
-      pixels[i + 2] += a;
+      let idx = getPixelIndex(x0, y0);
+      pixels[idx] += a;
+      pixels[idx + 1] += a;
+      pixels[idx + 2] += a;
 
       if (x0 == x1 && y0 == y1) break;
       e2 = err * 2;

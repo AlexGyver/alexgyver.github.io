@@ -12,7 +12,6 @@ let img = null;
 let nodes = [];
 let overlaps = []
 let length;
-let density = 1;
 
 let update_f = true;
 let node = 0;
@@ -28,11 +27,10 @@ let offs_x = 0, offs_y = 0;
 let offs_bx = 0, offs_by = 0;
 
 // =============== SETUP ===============
-function setup() {
-  let cWidth = ui_offs + cv_d * 2 + 50 * 3;
+function setup() {  let cWidth = ui_offs + cv_d * 2 + 50 * 3;
   let cHeight = cv_d + 100;
-  createCanvas(cWidth, cHeight);
   document.body.style.zoom = (Math.min( (innerHeight-25) / cHeight, (innerWidth-25) / cWidth)).toFixed(1); 
+  createCanvas(cWidth, cHeight);
   ui = QuickSettings.create(0, 0, "GyverBraid v1.1")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
@@ -106,7 +104,7 @@ function tracer() {
   setStatus("Running. Lines: " + count);
   let amount = ui_get("Node Amount");
   for (let i = 0; i < 10; i++) {
-    let max = 0;
+    let max = -10000000000;
     best = -1;
     
     loadPixels();
@@ -133,7 +131,7 @@ function tracer() {
 
     overlaps[best]++;
 
-    if (count > ui_get('Max Lines') || best < 0 || max < ui_get('Threshold') || stop_f) {
+    if (count > ui_get('Max Lines') || best < 0 || stop_f) {
       running = false;
       count--;
       setStatus("Done! " + count + " lines, " + Math.round(length / 100) + " m");
@@ -173,7 +171,6 @@ function tracer() {
     count++;
   }
 }
-
 function scanLine(start, end) {
   let xy = [get_xy(0, start), get_xy(0, end)];
 
@@ -193,7 +190,7 @@ function scanLine(start, end) {
 
   while (1) {
     let i = getPixelIndex(x0, y0);
-    sum += 200 - pixels[i];
+    sum += (255 - pixels[i]) - (255 - pixels[i+3]);
     len++;
 
     if (x0 == x1 && y0 == y1) break;
@@ -238,9 +235,20 @@ function clearLine(xy, w, a) {
 
     while (1) {
       let i = getPixelIndex(x0, y0);
-      pixels[i] += a;
-      pixels[i + 1] += a;
-      pixels[i + 2] += a;
+      if (pixels[i] + a < 255) {
+        pixels[i] += a;
+        pixels[i+1] += a;
+        pixels[i+2] += a;
+      } else {
+        const ra = a - (255 - pixels[i]);
+        pixels[i] = 255;
+        pixels[i+1] = 255;
+        pixels[i+2] = 255;
+        pixels[i+3] -= ra;
+        if (pixels[i+3] < 0 ) {
+          pixels[i+3] = 0;
+        }
+      }
 
       if (x0 == x1 && y0 == y1) break;
       e2 = err * 2;
@@ -538,19 +546,15 @@ function b_and_c(input, bright, cont) {
 
     let r = input.pixels[i];
     let g = input.pixels[i + 1];
-    let b = input.pixels[i + 2];
 
     r = (r * cont + bright);
     g = (g * cont + bright);
-    b = (b * cont + bright);
 
     r = r < 0 ? 0 : r > 255 ? 255 : r;
     g = g < 0 ? 0 : g > 255 ? 255 : g;
-    b = b < 0 ? 0 : b > 255 ? 255 : b;
 
     input.pixels[i] = r;
     input.pixels[i + 1] = g;
-    input.pixels[i + 2] = b;
   }
   input.updatePixels();
 }

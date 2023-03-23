@@ -17,7 +17,7 @@ let cv = [
 let ui;
 let img = null;
 let nodes = [];
-let overlaps = []
+let overlaps = [];
 let length;
 let density = 1;
 
@@ -118,7 +118,7 @@ function tracer() {
   setStatus("Running. Lines: " + count);
   let amount = ui_get("Node Amount");
   for (let i = 0; i < 10; i++) {
-    let max = 0;
+    let max = -10000000000;
     best = -1;
 
     loadPixels();

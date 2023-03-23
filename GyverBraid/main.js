@@ -35,7 +35,7 @@ function setup() {
   let html = document.documentElement;
   let wHeight = Math.max( body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight );
   let wWidth = Math.max( body.width, html.width );
-  html.style.zoom = math.min( wHeight / cHeight, wWidth / cWidth); 
+  html.style.zoom = Math.min( wHeight / cHeight, wWidth / cWidth); 
   createCanvas(cWidth, cHeight);
   ui = QuickSettings.create(0, 0, "GyverBraid v1.1")
     .addFileChooser("Pick Image", "", "", handleFile)

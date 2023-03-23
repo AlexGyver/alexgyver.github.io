@@ -119,6 +119,9 @@ function tracer() {
   let amount = ui_get("Node Amount");
   for (let i = 0; i < 10; i++) {
     let max = 0;
+    if (ui_get('Negative')) {
+      max = -10000000000;
+    }
     best = -1;
 
     loadPixels();

@@ -31,8 +31,8 @@ let offs_bx = 0, offs_by = 0;
 function setup() {
   let cWidth = ui_offs + cv_d * 2 + 50 * 3;
   let cHeight = cv_d + 100;
-  document.body.style.scale = (Math.min( (innerHeight-25) / cHeight, (innerWidth-25) / cWidth)).toFixed(1); 
   createCanvas(cWidth, cHeight);
+  document.body.style.zoom = (Math.min( (innerHeight-25) / cHeight, (innerWidth-25) / cWidth)).toFixed(1); 
   ui = QuickSettings.create(0, 0, "GyverBraid v1.1")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)

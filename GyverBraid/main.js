@@ -26,6 +26,9 @@ let start_x, start_y;
 let offs_x = 0, offs_y = 0;
 let offs_bx = 0, offs_by = 0;
 
+let radialFill = [];
+let radialGranularity = 32;
+
 // =============== SETUP ===============
 function setup() {
   createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
@@ -148,15 +151,15 @@ function tracer() {
 
     let xy = [get_xy(0, node), get_xy(0, best)];
 
-    if (!ui_get('Subtract')) {
+    /*if (!ui_get('Subtract')) {
       updatePixels();
       stroke(255, 255, 255, ui_get('Clear Alpha'));
       strokeWeight(ui_get('Clear Width'));
       line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
-    } else {
+    } else {*/
       clearLine(xy, ui_get('Clear Width'), ui_get('Clear Alpha'));
       updatePixels();
-    }
+    //}
 
     stroke(0, 0, 0, 150);
     strokeWeight(ui_get("Thickness") / ((ui_get("Diameter") * 10 / cv_d)));
@@ -183,11 +186,14 @@ function scanLine(start, end) {
   let dy = abs(y1 - y0);
   let err = dx - dy;
   let e2 = 0;
-  let len = 0;
+  let len = Math.sqrt(dx * dx + dy * dy);
+  let radialMask = getRadialMask(x0, y0, x1, y1);
 
   while (1) {
     let i = (x0 + y0 * width) * 4;
-    sum += 255 - pixels[i];
+    if (((radialFill[i] || 0) & radialMask) == 0) {
+      sum += 255 - pixels[i];
+    }
     len++;
 
     if (x0 == x1 && y0 == y1) break;
@@ -201,7 +207,7 @@ function scanLine(start, end) {
       y0 += sy;
     }
   }
-  return Math.round(sum);
+  return Math.round(sum * len);
 }
 function clearLine(xy, w, a) {
   for (let i = 0; i < w; i++) {
@@ -228,12 +234,14 @@ function clearLine(xy, w, a) {
     let dy = abs(y1 - y0);
     let err = dx - dy;
     let e2 = 0;
+    let radialMask = getRadialMask(x0, y0, x1, y1);
 
     while (1) {
-      let i = (x0 + y0 * width) * 4;
-      pixels[i] += a;
-      pixels[i + 1] += a;
-      pixels[i + 2] += a;
+      let n = (x0 + y0 * width) * 4;
+      radialFill[n] = (radialFill[n] || 0) | radialMask;
+      pixels[n] += a;
+      pixels[n + 1] += a;
+      pixels[n + 2] += a;
 
       if (x0 == x1 && y0 == y1) break;
       e2 = err * 2;
@@ -301,6 +309,11 @@ function get_xy_raw(x, y, r, cur, max) {
   y = Math.round(y);
   return { x, y };
 }
+function getRadialMask(x0, y0, x1, y1) {
+  let angle = x1 == x0 ? (y0 < y1 ? 1 : -1) : Math.atan((y1 - y0) / (x1 - x0));
+  let radialAngle = Math.round((angle + Math.PI / 2) * radialGranularity / Math.PI);
+  return 1 << radialAngle;
+}
 function inCanvas() {
   let vx = mouseX - cv[0].x;
   let vy = mouseY - cv[0].y;
@@ -348,6 +361,7 @@ function start() {
   count = 1;
   nodes = [0];
   overlaps = new Array(ui_get("Node Amount")).fill(0);
+  radialFill = [];
   length = 0;
   update_f = true;
   running = true;

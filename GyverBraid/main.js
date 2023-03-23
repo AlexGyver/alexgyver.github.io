@@ -12,6 +12,7 @@ let img = null;
 let nodes = [];
 let overlaps = []
 let length;
+let density = 1;
 
 let update_f = true;
 let node = 0;
@@ -29,7 +30,7 @@ let offs_bx = 0, offs_by = 0;
 // =============== SETUP ===============
 function setup() {
   createCanvas(ui_offs + cv_d * 2 + 50 * 3, cv_d + 100);
-  ui = QuickSettings.create(0, 0, "GyverBraid")
+  ui = QuickSettings.create(0, 0, "GyverBraid v1.1")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
@@ -66,6 +67,8 @@ function setup() {
   ui.hideControl('Edges');
   ui.hideControl('Threshold');
   ui.hideControl('Subtract');
+
+  density = pixelDensity();
 
   imageMode(CENTER);
   ellipseMode(CENTER);
@@ -185,7 +188,7 @@ function scanLine(start, end) {
   let len = 0;
 
   while (1) {
-    let i = (x0 + y0 * width) * 4;
+    let i = getPixelIndex(x0, y0);
     sum += 255 - pixels[i];
     len++;
 
@@ -200,6 +203,7 @@ function scanLine(start, end) {
       y0 += sy;
     }
   }
+  sum /= len;
   return Math.round(sum);
 }
 function clearLine(xy, w, a) {
@@ -229,7 +233,7 @@ function clearLine(xy, w, a) {
     let e2 = 0;
 
     while (1) {
-      let i = (x0 + y0 * width) * 4;
+      let i = getPixelIndex(x0, y0);
       pixels[i] += a;
       pixels[i + 1] += a;
       pixels[i + 2] += a;
@@ -466,6 +470,9 @@ function svg() {
 }
 
 // =============== UTILITY ===============
+function getPixelIndex(x, y) {
+  return (x + y * width * density) * 4 * density;
+}
 function edges(eimg) {
   let kernel = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]];
   eimg.loadPixels();

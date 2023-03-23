@@ -64,6 +64,7 @@ function setup() {
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
     .addBoolean('Negative', 0, update_h)
     .addBoolean('Center Balance', 0, update_h)
+    .addBoolean('Quarter', 0, update_h)
     .addHTML("Control",
       "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
       "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
@@ -132,6 +133,10 @@ function tracer() {
         if (dst > amount / 2) dst = amount - dst;
         dst = dst / amount * 360;
         if (dst < ui_get("Offset")) continue;
+
+        if (ui_get("Quarter")) {
+          if (i >= abs(node - (amount / 4) / 2) && i <= abs(node + (amount / 4) / 2)) continue;
+        }
       }
 
       if (ui_get("Overlaps") > 0 && overlaps[i] + 1 > ui_get("Overlaps")) continue;

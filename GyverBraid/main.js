@@ -486,7 +486,7 @@ function template() {
   const offs = 100;
   const ratio = 3.778;
   let size = Math.round(ui_get('Diameter') * 10 * ratio) + offs * 2;
-
+  let am = ui_get('Node Amount');
 
   let pg = createGraphics(size, size);
   pg.background(255);
@@ -495,11 +495,12 @@ function template() {
   let y = 0;
   pg.text('Diameter = ' + ui_get('Diameter') + ' cm', 20, y += 25);
   pg.text('Print size = ' + D + 'x' + D + ' cm', 20, y += 25);
+  pg.text('Nail distance = ' + (3.14 * D * 10 / am).toFixed(1) + ' mm', 20, y += 25);
 
   pg.fill(0);
   pg.textAlign(CENTER, CENTER);
   //pg.textFont('Trebuchet MS');
-  let am = ui_get('Node Amount');
+  
 
   pg.stroke(0);
   pg.line(size / 2 - 80, size / 2, size / 2 + 80, size / 2);

@@ -154,6 +154,7 @@ function tracer() {
   let ui_clear_w = ui_get('Clear Width');
   let ui_diameter = ui_get("Diameter");
   let ui_thick = ui_get("Thickness");
+  let last_max = [1,1,1,1,1];
 
   for (let i = 0; i < 20; i++) {
     let max = -10000000000;
@@ -183,10 +184,14 @@ function tracer() {
         best = i;
       }
     }
-
     overlaps[best]++;
 
-    if (count > ui_max || best < 0 || max == 0 || /*max < ui_get('Threshold') || */stop_f) {
+    last_max.push(max);
+    last_max.shift();
+    let stop = true;
+    for (let m in last_max) if (last_max[m] != 0) stop = false;
+
+    if (count > ui_max || best < 0 || stop || /*max < ui_get('Threshold') || */stop_f) {
       running = false;
       count--;
       setStatus("Done! " + count + " lines, " + Math.round(length / 100) + " m, max overlap " + Math.max(...overlaps) + ' in ' + ((Date.now() - tmr) / 1000).toFixed(1) + ' seconds');

@@ -50,11 +50,11 @@ function setup() {
   createCanvas(cWidth, cHeight);
 
   help = QuickSettings.create(ui_offs - 10, 0, "Помощь (кликни дважды)")
-    .addHTML("Выбор изображения", '')
+    .addHTML("Выбор изображения", '<div style="height:30px"></div>')
     .addHTML('Размер изображения', '<div style="height:20px"></div>')
     .addHTML('Яркость', '<div style="height:20px"></div>')
     .addHTML('Контраст', '<div style="height:20px"></div>')
-    .addHTML('Диаметр холста, см', '<div style="height:25px"></div>')
+    .addHTML('Диаметр холста, см', '<div style="height:20px"></div>')
     .addHTML('Толщина нитки, мм', '<div style="height:20px"></div>')
     .addHTML('Количество гвоздей', '<div style="height:20px"></div>')
     .addHTML('Максимум линий', '<div style="height:20px"></div>')
@@ -71,7 +71,7 @@ function setup() {
     .collapse()
 
   ui = QuickSettings.create(0, 0, "GyverBraid v1.3")
-    .addHTML("Pick Image", "", "", handleFile)
+    .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
     .addRange('Contrast', 0, 5.0, 1.0, 0.1, update_h)

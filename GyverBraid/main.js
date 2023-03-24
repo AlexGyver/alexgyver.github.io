@@ -14,7 +14,7 @@ let cv = [
   { x: ui_offs + cv_d / 2 + 50, y: 50 + cv_d / 2 },
   { x: ui_offs + cv_d + 100 + cv_d / 2, y: 50 + cv_d / 2 }
 ];
-let ui;
+let ui, help;
 let img = null;
 let nodes = [];
 let overlaps = [];
@@ -49,8 +49,29 @@ function setup() {
   document.body.style.zoom = (Math.min((innerHeight - 25) / cHeight, (innerWidth - 25) / cWidth)).toFixed(1);
   createCanvas(cWidth, cHeight);
 
+  help = QuickSettings.create(ui_offs - 10, 0, "Помощь (кликни дважды)")
+    .addHTML("Выбор изображения", '')
+    .addHTML('Размер изображения', '<div style="height:20px"></div>')
+    .addHTML('Яркость', '<div style="height:20px"></div>')
+    .addHTML('Контраст', '<div style="height:20px"></div>')
+    .addHTML('Диаметр холста, см', '<div style="height:25px"></div>')
+    .addHTML('Толщина нитки, мм', '<div style="height:20px"></div>')
+    .addHTML('Количество гвоздей', '<div style="height:20px"></div>')
+    .addHTML('Максимум линий', '<div style="height:20px"></div>')
+    .addHTML('Ширина очистки', '<div style="height:20px"></div>')
+    .addHTML('Прозрачность очистки', '<div style="height:20px"></div>')
+    .addHTML('Запрет на угол возврата', '<div style="height:20px"></div>')
+    .addHTML('Максимум ниток на гвозде', '<div style="height:20px"></div>')
+    .addHTML('Оптимизация чёрных полос', '')
+    .addHTML('Общее улучшение', '')
+    .addHTML('Приоритет линий в центре', '')
+    .addHTML('Минимальное расстояние до след. гвоздя - 1/4 круга', '')
+    .setWidth(200)
+    .setDraggable(false)
+    .collapse()
+
   ui = QuickSettings.create(0, 0, "GyverBraid v1.3")
-    .addFileChooser("Pick Image", "", "", handleFile)
+    .addHTML("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
     .addRange('Contrast', 0, 5.0, 1.0, 0.1, update_h)
@@ -65,7 +86,6 @@ function setup() {
 
     .addRange('Clear Width', 1.0, 5, 3, 0.5, update_h)
     .addRange('Clear Alpha', 0, 255, 20, 5, update_h)
-    .addBoolean('Subtract', 1, update_h)
     .addRange('Offset', 0, 100, 10, 5, update_h)
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
     .addBoolean('Radial Granularity', 0, update_h)
@@ -89,7 +109,6 @@ function setup() {
   //ui.hideControl('Thickness');
   ui.hideControl('Edges');
   ui.hideControl('Threshold');
-  ui.hideControl('Subtract');
 
   density = pixelDensity();
 
@@ -130,7 +149,6 @@ function tracer() {
   let ui_offset = ui_get("Offset");
   let ui_quarter = ui_get("Quarter");
   let ui_overlaps = ui_get("Overlaps");
-  let ui_subtract = ui_get('Subtract');
   let ui_max = ui_get('Max Lines');
   let ui_clear_a = ui_get('Clear Alpha');
   let ui_clear_w = ui_get('Clear Width');
@@ -181,18 +199,15 @@ function tracer() {
     }
 
     nodes.push(best);
-
     let xy = [get_xy(0, node), get_xy(0, best)];
-
-    if (!ui_subtract) {
-      updatePixels();
-      stroke(255, 255, 255, ui_clear_a);
-      strokeWeight(ui_clear_w);
-      line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
-    } else {
-      clearLine(xy, ui_clear_w, ui_clear_a);
-      updatePixels();
-    }
+    /*
+    updatePixels();
+    stroke(255, 255, 255, ui_clear_a);
+    strokeWeight(ui_clear_w);
+    line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
+    */
+    clearLine(xy, ui_clear_w, ui_clear_a);
+    updatePixels();
 
     stroke(0, 0, 0, 150);
     strokeWeight(ui_thick / ((ui_diameter * 10 / cv_d)));

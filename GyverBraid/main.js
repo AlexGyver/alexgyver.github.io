@@ -124,9 +124,6 @@ function tracer() {
 
     loadPixels();
 
-    const left_limit = node - amount / 8;
-    const right_limit = node + amount / 8;
-
     for (let i = 1; i < amount; i++) {
       let dst = abs(i - nodes[count - 1]);
       if (dst > amount / 2) dst = amount - dst;
@@ -139,15 +136,9 @@ function tracer() {
         if (dst < ui_get("Offset")) continue;
 
         if (ui_get("Quarter")) {
-          if (left_limit < 0) {
-            if ( (i >= 0 && i <= right_limit) || (i >= amount + left_limit && i <= amount) ) {
-              continue;
-            }
-          } else if (right_limit > amount) {
-            if ( (i >= left_limit && i <= amount) || (i >= 0 && i <= right_limit - amount) ) {
-              continue;
-            }
-          } else if (i >= left_limit && i <= right_limit) {
+          const delta = abs(node - i)
+          const len = min(amount - delta, delta)
+          if (len <= amount / 8) {
             continue;
           }
         }

@@ -29,6 +29,12 @@ let running = false;
 let stop_f = false;
 let costyl = 0;
 let hold_f = false;
+let radialGranularity = 32;
+let tmr;
+
+let ui_negative;
+let ui_center;
+let ui_radial;
 
 let start_x, start_y;
 let offs_x = 0, offs_y = 0;
@@ -43,7 +49,7 @@ function setup() {
   document.body.style.zoom = (Math.min((innerHeight - 25) / cHeight, (innerWidth - 25) / cWidth)).toFixed(1);
   createCanvas(cWidth, cHeight);
 
-  ui = QuickSettings.create(0, 0, "GyverBraid v1.2")
+  ui = QuickSettings.create(0, 0, "GyverBraid v1.3")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
@@ -57,11 +63,12 @@ function setup() {
     .addRange('Max Lines', 0, 5000, 1500, 50, update_h)
     .addRange('Threshold', 0, 2000, 0, 0, update_h)
 
-    .addRange('Clear Width', 0.5, 5, 3, 0.5, update_h)
+    .addRange('Clear Width', 1.0, 5, 3, 0.5, update_h)
     .addRange('Clear Alpha', 0, 255, 20, 5, update_h)
     .addBoolean('Subtract', 1, update_h)
     .addRange('Offset', 0, 100, 10, 5, update_h)
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
+    .addBoolean('Radial Granularity', 0, update_h)
     .addBoolean('Negative', 0, update_h)
     .addBoolean('Center Balance', 0, update_h)
     .addBoolean('Quarter', 0, update_h)
@@ -117,29 +124,40 @@ function draw() {
 // =============== TRACER ===============
 function tracer() {
   setStatus("Running. Lines: " + count);
-  let amount = ui_get("Node Amount");
-  for (let i = 0; i < 10; i++) {
+
+  // it's faster
+  let ui_amount = ui_get("Node Amount");
+  let ui_offset = ui_get("Offset");
+  let ui_quarter = ui_get("Quarter");
+  let ui_overlaps = ui_get("Overlaps");
+  let ui_subtract = ui_get('Subtract');
+  let ui_max = ui_get('Max Lines');
+  let ui_clear_a = ui_get('Clear Alpha');
+  let ui_clear_w = ui_get('Clear Width');
+  let ui_diameter = ui_get("Diameter");
+  let ui_thick = ui_get("Thickness");
+
+  for (let i = 0; i < 20; i++) {
     let max = -10000000000;
     best = -1;
 
     loadPixels();
-    for (let i = 1; i < amount; i++) {
-      let dst = abs(i - nodes[count - 1]);
-      if (dst > amount / 2) dst = amount - dst;
-      if (dst < 10) continue;
+    for (let i = 1; i < ui_amount; i++) {
+      if (node == i) continue;
 
       if (count >= 2) {
         dst = abs(i - nodes[count - 2]);
-        if (dst > amount / 2) dst = amount - dst;
-        dst = dst / amount * 360;
-        if (dst < ui_get("Offset")) continue;
-
-        if (ui_get("Quarter")) {
-          if (i >= abs(node - (amount / 4) / 2) && i <= abs(node + (amount / 4) / 2)) continue;
-        }
+        if (dst > ui_amount / 2) dst = ui_amount - dst;
+        dst = dst / ui_amount * 360;
+        if (dst < ui_offset) continue;
       }
 
-      if (ui_get("Overlaps") > 0 && overlaps[i] + 1 > ui_get("Overlaps")) continue;
+      if (ui_quarter) {
+        let delta = abs(node - i);
+        if (min(ui_amount - delta, delta) <= ui_amount / 8) continue;
+      }
+
+      if (ui_overlaps > 0 && overlaps[i] + 1 > ui_overlaps) continue;
       let res = scanLine(node, i);
 
       if (res > max) {
@@ -150,17 +168,13 @@ function tracer() {
 
     overlaps[best]++;
 
-    if (count > ui_get('Max Lines') || best < 0 || /*max < ui_get('Threshold') || */stop_f) {
+    if (count > ui_max || best < 0 || max == 0 || /*max < ui_get('Threshold') || */stop_f) {
       running = false;
       count--;
-      setStatus("Done! " + count + " lines, " + Math.round(length / 100) + " m");
-
+      setStatus("Done! " + count + " lines, " + Math.round(length / 100) + " m, max overlap " + Math.max(...overlaps) + ' in ' + ((Date.now() - tmr) / 1000).toFixed(1) + ' seconds');
       ui_set("Nodes", nodes);
-      nodes.push(amount & 0xff);
+      nodes.push(ui_amount & 0xff);
 
-      let u8 = new Uint8Array(nodes);
-      var decoder = new TextDecoder('utf8');
-      //ui_set("Nodes B64", btoa(nodes.map(function (v) { return String.fromCharCode(v) }).join('')));
       ui_set("Nodes B64", btoa(String.fromCharCode.apply(null, new Uint8Array(nodes))));
       nodes.pop();
       return;
@@ -170,22 +184,22 @@ function tracer() {
 
     let xy = [get_xy(0, node), get_xy(0, best)];
 
-    if (!ui_get('Subtract')) {
+    if (!ui_subtract) {
       updatePixels();
-      stroke(255, 255, 255, ui_get('Clear Alpha'));
-      strokeWeight(ui_get('Clear Width'));
+      stroke(255, 255, 255, ui_clear_a);
+      strokeWeight(ui_clear_w);
       line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
     } else {
-      clearLine(xy, ui_get('Clear Width'), ui_get('Clear Alpha'));
+      clearLine(xy, ui_clear_w, ui_clear_a);
       updatePixels();
     }
 
     stroke(0, 0, 0, 150);
-    strokeWeight(ui_get("Thickness") / ((ui_get("Diameter") * 10 / cv_d)));
+    strokeWeight(ui_thick / ((ui_diameter * 10 / cv_d)));
 
     xy = [get_xy(1, node), get_xy(1, best)];
     line(xy[0].x, xy[0].y, xy[1].x, xy[1].y);
-    length += dist(xy[0].x, xy[0].y, xy[1].x, xy[1].y) * ui_get("Diameter") / (cv_d);
+    length += dist(xy[0].x, xy[0].y, xy[1].x, xy[1].y) * ui_diameter / (cv_d);
     node = best;
     count++;
   }
@@ -206,25 +220,30 @@ function scanLine(start, end) {
   let err = dx - dy;
   let e2 = 0;
   let len = 0;
+  let radialMask = getRadialMask(x0, y0, x1, y1);
 
   while (1) {
     let i = getPixelIndex(x0, y0);
     let val;
 
-    if (ui_get('Negative')) {
+    if (ui_negative) {
       val = (255 - pixels[i]) - (255 - pixels[i + 3]);
     } else {
       val = 255 - pixels[i];
     }
 
-    if (ui_get('Center Balance')) {
+    if (ui_center) {
       let cx = abs(cv[0].x - x0);
       let cy = abs(cv[0].y - y0);
       let cl = Math.sqrt(cx * cx + cy * cy);
       val *= Math.log(cv_d / 2 / cl);
     }
 
-    sum += val;
+    if (ui_radial) {
+      if (radialMask == 0 || ((radialFill[i] || 0) & radialMask) == 0) sum += val;
+    } else {
+      sum += val;
+    }
 
     len++;
 
@@ -267,11 +286,13 @@ function clearLine(xy, w, a) {
     let dy = abs(y1 - y0);
     let err = dx - dy;
     let e2 = 0;
+    let radialMask = getRadialMask(x0, y0, x1, y1);
 
     while (1) {
       let i = getPixelIndex(x0, y0);
+      radialFill[i] = (radialFill[i] || 0) | radialMask;
 
-      if (ui_get('Negative')) {
+      if (ui_negative) {
         if (pixels[i] + a < 255) {
           pixels[i] += a;
           pixels[i + 1] += a;
@@ -391,6 +412,10 @@ function mouseWheel(event) {
 function update_h() {
   update_f = true;
   running = false;
+  //radialGranularity = ui_get("Radial Granularity");
+  ui_negative = ui_get('Negative');
+  ui_center = ui_get('Center Balance');
+  ui_radial = ui_get('Radial Granularity');
 }
 /*function resize(val) {
   cv_d = val;
@@ -409,6 +434,8 @@ function start() {
   update_f = true;
   running = true;
   stop_f = false;
+  radialFill = [];
+  tmr = Date.now();
 }
 function stop() {
   if (!running) update_f = true;
@@ -524,6 +551,12 @@ function svg() {
 }
 
 // =============== UTILITY ===============
+function getRadialMask(x0, y0, x1, y1) {
+  if (radialGranularity <= 0) return 0;
+  let angle = x1 == x0 ? (y0 < y1 ? 1 : -1) : Math.atan((y1 - y0) / (x1 - x0));
+  let radialAngle = Math.round((angle + Math.PI / 2) * radialGranularity / Math.PI);
+  return 1 << radialAngle;
+}
 function getPixelIndex(x, y) {
   return Math.round((x + y * width * density) * 4 * density);
 }

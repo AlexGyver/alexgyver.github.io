@@ -27,7 +27,6 @@ let count = 0;
 let best = 0;
 let running = false;
 let stop_f = false;
-let costyl = 0;
 let hold_f = false;
 let radialGranularity = 32;
 let tmr;
@@ -70,7 +69,7 @@ function setup() {
     .setDraggable(false)
     .collapse()
 
-  ui = QuickSettings.create(0, 0, "GyverBraid v1.3")
+  ui = QuickSettings.create(0, 0, "GyverBraid v1.4")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
@@ -118,8 +117,7 @@ function setup() {
 
 // =============== MAIN LOOP ===============
 function draw() {
-  if (update_f || costyl > 0 || hold_f) {
-    if (costyl > 0) costyl--;
+  if (update_f || hold_f) {
     if (hold_f) {
       offs_x = offs_bx + mouseX - start_x;
       offs_y = offs_by + mouseY - start_y;
@@ -154,14 +152,14 @@ function tracer() {
   let ui_clear_w = ui_get('Clear Width');
   let ui_diameter = ui_get("Diameter");
   let ui_thick = ui_get("Thickness");
-  let last_max = [1,1,1,1,1];
+  let last_max = [1, 1, 1, 1, 1];
 
   for (let i = 0; i < 20; i++) {
     let max = -10000000000;
     best = -1;
 
     loadPixels();
-    for (let i = 1; i < ui_amount; i++) {
+    for (let i = 0; i < ui_amount; i++) {
       if (node == i) continue;
 
       if (count >= 2) {
@@ -362,11 +360,10 @@ function showImage() {
     let img_y = cv[0].y + offs_y;
     let show = createImage(img.width, img.height);
     show.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
-    show.filter(GRAY);
-    show.resize(ui_get("Size"), 0);
+    if (img.width < img.height) img.resize(ui_get("Size"), 0);
+    else img.resize(0, ui_get("Size"));
+    //if (ui_get('Edges')) edges(show);
     b_and_c(show, ui_get("Brightness"), ui_get("Contrast"));
-    //if (ui_get('Edges') && !hold_f) edges(show);
-    //image(show, img_x, img_y, show.width, show.height);
     copy(show, 0, 0, show.width, show.height, img_x - show.width / 2, img_y - show.width / 2, show.width, show.height);
   }
 }
@@ -437,14 +434,6 @@ function update_h() {
   ui_center = ui_get('Center Balance');
   ui_radial = ui_get('Radial Granularity');
 }
-/*function resize(val) {
-  cv_d = val;
-  cv = [
-    { x: ui_offs + cv_d / 2 + 50, y: 50 + cv_d / 2 },
-    { x: ui_offs + cv_d + 100 + cv_d / 2, y: 50 + cv_d / 2 }
-  ];
-  update_f = true;
-}*/
 function start() {
   node = 0;
   count = 1;
@@ -462,19 +451,23 @@ function stop() {
   stop_f = true;
 }
 function handleFile(file) {
-  img = loadImage(URL.createObjectURL(file));
-  if (!file.type.toString().includes('image')) {
-    img = null;
-    return;
+  if (file.type.toString().includes('image')) {
+    loadImage(URL.createObjectURL(file), nimg => {
+      img = createImage(nimg.width, nimg.height);
+      img.copy(nimg, 0, 0, nimg.width, nimg.height, 0, 0, nimg.width, nimg.height);
+      if (img.width < img.height) img.resize(cv_d, 0);
+      else img.resize(0, cv_d);
+      img.filter(GRAY);
+
+      stop_f = true;
+      update_h();
+      ui_set('Brightness', 0);
+      ui_set('Contrast', 1);
+      ui_set('Size', cv_d);
+      offs_x = offs_bx = 0;
+      offs_y = offs_by = 0;
+    });
   }
-  stop_f = true;
-  update_h();
-  ui_set('Brightness', 0);
-  ui_set('Contrast', 1);
-  ui_set('Size', 700);
-  costyl = 8;
-  offs_x = offs_bx = 0;
-  offs_y = offs_by = 0;
 }
 function knit() {
   let s = document.location.toString();
@@ -500,7 +493,7 @@ function template() {
   pg.fill(0);
   pg.textAlign(CENTER, CENTER);
   //pg.textFont('Trebuchet MS');
-  
+
 
   pg.stroke(0);
   pg.line(size / 2 - 80, size / 2, size / 2 + 80, size / 2);
@@ -582,46 +575,31 @@ function getPixelIndex(x, y) {
   return Math.round((x + y * width * density) * 4 * density);
 }
 function edges(eimg) {
-  let kernel = [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]];
-  eimg.loadPixels();
-  let arr = [];
-  for (let i = 0; i < eimg.width * eimg.height; i++) {
-    arr.push(eimg.pixels[i * 4]);
-  }
+  let kernel = [[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]];
+  let bimg = createImage(eimg.width, eimg.height);
+  bimg.copy(eimg, 0, 0, eimg.width, eimg.height, 0, 0, eimg.width, eimg.height);
 
-  for (let x = 1; x < eimg.width - 1; x++) {
-    for (let y = 1; y < eimg.height - 1; y++) {
+  bimg.loadPixels();
+  eimg.loadPixels();
+
+  for (let x = 1; x < bimg.width - 1; x++) {
+    for (let y = 1; y < bimg.height - 1; y++) {
       let sum = 0;
 
       for (kx = -1; kx <= 1; kx++) {
         for (ky = -1; ky <= 1; ky++) {
-          let xpos = x + kx;
-          let ypos = y + ky;
-
-          //let idx = (xpos + ypos * eimg.width) * 4;
-          //let val = eimg.pixels[idx];
-          let val = red(eimg.get(xpos, ypos));
-
-          //let val = arr[(xpos + ypos * eimg.width)];
+          let idx = ((x + kx) + (y + ky) * bimg.width) * 4;
+          let val = bimg.pixels[idx];
           sum += kernel[ky + 1][kx + 1] * val;
         }
       }
-      //sum = constrain(sum, 0, 255);
-      //arr[(x + y * eimg.width)] = sum;
-      //let idx = (x + y * eimg.width) * 4;
-      //eimg.pixels[idx] = sum;
-      //eimg.pixels[idx+1] = sum;
-      //eimg.pixels[idx+2] = sum;
-
-      eimg.set(x, y, color(sum, sum, sum));
+      sum = constrain(sum, 0, 255);
+      let idx = (x + y * bimg.width) * 4;
+      eimg.pixels[idx] = sum;
+      eimg.pixels[idx + 1] = sum;
+      eimg.pixels[idx + 2] = sum;
     }
   }
-  for (let i = 0; i < eimg.width * eimg.height; i++) {
-    eimg.pixels[i * 4] = arr[i];
-    eimg.pixels[i * 4 + 1] = arr[i];
-    eimg.pixels[i * 4 + 2] = arr[i];
-  }
-
   eimg.updatePixels();
 }
 function setStatus(stat) {

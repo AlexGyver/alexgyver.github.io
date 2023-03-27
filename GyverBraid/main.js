@@ -363,6 +363,7 @@ function showImage() {
     if (show.width < show.height) show.resize(ui_get("Size"), 0);
     else show.resize(0, ui_get("Size"));
     show.filter(GRAY);
+    b_and_c(show, ui_get("Brightness"), ui_get("Contrast"));
     if (ui_get('Gamma') > 1.0) gamma(show);
     
     let edge_i = ui_get('Edges').index;
@@ -370,8 +371,6 @@ function showImage() {
       if (edge_i == 1) edges(show);
       else sobel_edges(show, edge_i);
     }
-    
-    b_and_c(show, ui_get("Brightness"), ui_get("Contrast"));
     copy(show, 0, 0, show.width, show.height, img_x - show.width / 2, img_y - show.width / 2, show.width, show.height);
   }
 }
@@ -472,6 +471,7 @@ function handleFile(file) {
       ui_set('Edges', 0);
       ui_set('Contrast', 1);
       ui_set('Size', cv_d);
+      ui_set('Gamma', 1);
       offs_x = offs_bx = 0;
       offs_y = offs_by = 0;
     });
@@ -610,7 +610,6 @@ function edges(eimg) {
   }
   eimg.updatePixels();
 }
-
 function gamma(oimg) {
   let exp = ui_get('Gamma');
   oimg.loadPixels();

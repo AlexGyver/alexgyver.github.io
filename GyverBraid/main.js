@@ -53,6 +53,8 @@ function setup() {
     .addHTML('Размер изображения', '<div style="height:20px"></div>')
     .addHTML('Яркость', '<div style="height:20px"></div>')
     .addHTML('Контраст', '<div style="height:20px"></div>')
+    .addHTML('Гамма', '<div style="height:20px"></div>')
+    .addHTML('Выделить края', '<div style="height:20px"></div>')
     .addHTML('Диаметр холста, см', '<div style="height:20px"></div>')
     .addHTML('Толщина нитки, мм', '<div style="height:20px"></div>')
     .addHTML('Количество гвоздей', '<div style="height:20px"></div>')
@@ -69,20 +71,19 @@ function setup() {
     .setDraggable(false)
     .collapse()
 
-  ui = QuickSettings.create(0, 0, "GyverBraid v1.4")
+  ui = QuickSettings.create(0, 0, "GyverBraid v1.5")
     .addFileChooser("Pick Image", "", "", handleFile)
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
     .addRange('Contrast', 0, 5.0, 1.0, 0.1, update_h)
-    .addBoolean('Edges', 0, update_h)
+    .addRange('Gamma', 1.0, 1.2, 0.0, 0.005, update_h)
+    .addDropDown('Edges', ['None', 'Simple', 'Sobel 0.2', 'Sobel 0.4', 'Sobel 0.6', 'Sobel 0.8'], update_h)
 
     .addNumber('Diameter', 10, 100, 30, 0.1, update_h)
     .addRange('Thickness', 0.1, 1.0, 0.5, 0.1, update_h)
     .addRange('Node Amount', 100, 255, 200, 5, update_h)
-
     .addRange('Max Lines', 0, 5000, 1500, 50, update_h)
     .addRange('Threshold', 0, 2000, 0, 0, update_h)
-
     .addRange('Clear Width', 1.0, 5, 3, 0.5, update_h)
     .addRange('Clear Alpha', 0, 255, 20, 5, update_h)
     .addRange('Offset', 0, 100, 10, 5, update_h)
@@ -106,7 +107,6 @@ function setup() {
     .setCollapsible(false);
 
   //ui.hideControl('Thickness');
-  ui.hideControl('Edges');
   ui.hideControl('Threshold');
 
   density = pixelDensity();
@@ -360,9 +360,17 @@ function showImage() {
     let img_y = cv[0].y + offs_y;
     let show = createImage(img.width, img.height);
     show.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
-    if (img.width < img.height) img.resize(ui_get("Size"), 0);
-    else img.resize(0, ui_get("Size"));
-    //if (ui_get('Edges')) edges(show);
+    if (show.width < show.height) show.resize(ui_get("Size"), 0);
+    else show.resize(0, ui_get("Size"));
+    show.filter(GRAY);
+    if (ui_get('Gamma') > 1.0) gamma(show);
+    
+    let edge_i = ui_get('Edges').index;
+    if (edge_i > 0 && !hold_f) {
+      if (edge_i == 1) edges(show);
+      else sobel_edges(show, edge_i);
+    }
+    
     b_and_c(show, ui_get("Brightness"), ui_get("Contrast"));
     copy(show, 0, 0, show.width, show.height, img_x - show.width / 2, img_y - show.width / 2, show.width, show.height);
   }
@@ -457,11 +465,11 @@ function handleFile(file) {
       img.copy(nimg, 0, 0, nimg.width, nimg.height, 0, 0, nimg.width, nimg.height);
       if (img.width < img.height) img.resize(cv_d, 0);
       else img.resize(0, cv_d);
-      img.filter(GRAY);
 
       stop_f = true;
       update_h();
       ui_set('Brightness', 0);
+      ui_set('Edges', 0);
       ui_set('Contrast', 1);
       ui_set('Size', cv_d);
       offs_x = offs_bx = 0;
@@ -601,6 +609,76 @@ function edges(eimg) {
     }
   }
   eimg.updatePixels();
+}
+
+function gamma(oimg) {
+  let exp = ui_get('Gamma');
+  oimg.loadPixels();
+  for (let i = 0; i < oimg.width * oimg.height * 4; i += 4) {
+    let val = Math.pow(oimg.pixels[i], exp);
+    oimg.pixels[i] = val;
+    oimg.pixels[i + 1] = val;
+    oimg.pixels[i + 2] = val;
+  }
+  oimg.updatePixels();
+}
+function sobel_edges(oimg, idx) {
+  let kernel_x = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]];
+  let kernel_y = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]];
+  let W = oimg.width;
+  let H = oimg.height;
+
+  let bimg = createImage(W, H);
+  bimg.copy(oimg, 0, 0, W, H, 0, 0, W, H);
+
+  bimg.loadPixels();
+  oimg.loadPixels();
+
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      let sum_x = 0;
+      let sum_y = 0;
+
+      if (!((x == 0) || (x == W - 1) || (y == 0) || (y == H - 1))) {
+        for (kx = -1; kx <= 1; kx++) {
+          for (ky = -1; ky <= 1; ky++) {
+            let idx = ((x + kx) + (y + ky) * W) * 4;
+            let val = oimg.pixels[idx];
+            sum_x += kernel_x[ky + 1][kx + 1] * val;
+            sum_y += kernel_y[ky + 1][kx + 1] * val;
+          }
+        }
+      }
+
+      let sum = sqrt(sum_x * sum_x + sum_y * sum_y);
+      sum = constrain(sum, 0, 255);
+
+      let idx = (x + y * W) * 4;
+      bimg.pixels[idx] = sum;
+      bimg.pixels[idx + 1] = sum;
+      bimg.pixels[idx + 2] = sum;
+    }
+  }
+  bimg.updatePixels();
+  bimg.filter(INVERT);
+  bimg.loadPixels();
+
+  let k = 0;
+  switch (idx) {
+    case 2: k = 0.2; break;
+    case 3: k = 0.4; break;
+    case 4: k = 0.6; break;
+    case 5: k = 0.8; break;
+  }
+
+  for (let i = 0; i < W * H * 4; i += 4) {
+    let val = oimg.pixels[i] * (1 - k) + bimg.pixels[i] * k;
+    oimg.pixels[i] = val;
+    oimg.pixels[i + 1] = val;
+    oimg.pixels[i + 2] = val;
+  }
+
+  oimg.updatePixels();
 }
 function setStatus(stat) {
   ui_set("Status", stat);

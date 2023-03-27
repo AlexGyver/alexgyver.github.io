@@ -25,6 +25,7 @@ function get_xy_raw(x, y, r, cur, max) {
 
 function draw() {
   background(255);
+  label.innerHTML = slider.value;
   if (lines.length != 0) {
     for (let i = 1; i < slider.value; i++) {
       let xy0 = get_xy_raw(width / 2, height / 2, width / 2, lines[i], amount);

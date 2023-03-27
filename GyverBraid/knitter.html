@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="favicon.svg">
     <link href="https://use.fontawesome.com/releases/v6.3.0/css/all.css" rel="stylesheet">
-    
+
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
         (function (m, e, t, r, i, k, a) {
@@ -97,7 +97,7 @@
             <div class="ctrl_row">
                 <input type="number" class="inp text" id="current">
                 <label class="inp" id="percent">0</label>
-                <button class="inp" onclick="cur=Number(current.value);next()">SET</button>
+                <button class="inp" onclick="setCurrent();next()">SET</button>
             </div>
             <div class="ctrl_row">
                 <button class="inp" id="auto_start">▶</button>
@@ -147,6 +147,12 @@
             if (event.code == 'Space') next();
         }, false);
 
+        function setCurrent() {
+            let val = Number(current.value);
+            if (val < 0) val = 0;
+            if (val > lines.length - 1) val = lines.length - 1;
+            cur = val;
+        }
         function load() {
             scale = cv.width / 600;
             W2 = cv.width / 2;
@@ -157,7 +163,6 @@
             } catch (e) {
                 return;
             }
-            console.log(lines);
             amount = lines.pop();
             start = false;
 
@@ -230,6 +235,7 @@
             cx.stroke();
         }
         function next() {
+            if (cur > lines.length - 1) return;
             if (!start) {
                 cx.clearRect(0, 0, cv.width, cv.height);
                 //drawNums();

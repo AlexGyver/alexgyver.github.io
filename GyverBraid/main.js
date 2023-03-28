@@ -53,7 +53,7 @@ function setup() {
     .addHTML('Размер изображения', '<div style="height:20px"></div>')
     .addHTML('Яркость', '<div style="height:20px"></div>')
     .addHTML('Контраст', '<div style="height:20px"></div>')
-    .addHTML('Гамма', '<div style="height:20px"></div>')
+    .addHTML('Гамма (средние тона)', '<div style="height:20px"></div>')
     .addHTML('Выделить края', '<div style="height:20px"></div>')
     .addHTML('Диаметр холста, см', '<div style="height:20px"></div>')
     .addHTML('Толщина нитки, мм', '<div style="height:20px"></div>')
@@ -76,7 +76,7 @@ function setup() {
     .addRange('Size', cv_d - 300, cv_d + 500, cv_d, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
     .addRange('Contrast', 0, 5.0, 1.0, 0.1, update_h)
-    .addRange('Gamma', 1.0, 1.2, 0.0, 0.005, update_h)
+    .addRange('Gamma', 0, 2, 0.0, 0.05, update_h)
     .addDropDown('Edges', ['None', 'Simple', 'Sobel 0.2', 'Sobel 0.4', 'Sobel 0.6', 'Sobel 0.8'], update_h)
 
     .addNumber('Diameter', 10, 100, 30, 0.1, update_h)
@@ -89,7 +89,7 @@ function setup() {
     .addRange('Offset', 0, 100, 10, 5, update_h)
     .addRange('Overlaps', 0, 15, 0, 1, update_h)
     .addBoolean('Radial Granularity', 0, update_h)
-    .addBoolean('Negative', 0, update_h)
+    .addBoolean('Negative', 1, update_h)
     .addBoolean('Center Balance', 0, update_h)
     .addBoolean('Quarter', 0, update_h)
     .addHTML("Control",
@@ -364,7 +364,7 @@ function showImage() {
     else show.resize(0, ui_get("Size"));
     show.filter(GRAY);
     b_and_c(show, ui_get("Brightness"), ui_get("Contrast"));
-    if (ui_get('Gamma') > 1.0) gamma(show);
+    if (ui_get('Gamma') != 1.0) gamma(show, ui_get('Gamma'));
     
     let edge_i = ui_get('Edges').index;
     if (edge_i > 0 && !hold_f) {
@@ -610,11 +610,10 @@ function edges(eimg) {
   }
   eimg.updatePixels();
 }
-function gamma(oimg) {
-  let exp = ui_get('Gamma');
+function gamma(oimg, exp) {
   oimg.loadPixels();
   for (let i = 0; i < oimg.width * oimg.height * 4; i += 4) {
-    let val = Math.pow(oimg.pixels[i], exp);
+    let val = Math.pow(oimg.pixels[i] / 255.0, exp) * 255;
     oimg.pixels[i] = val;
     oimg.pixels[i + 1] = val;
     oimg.pixels[i + 2] = val;

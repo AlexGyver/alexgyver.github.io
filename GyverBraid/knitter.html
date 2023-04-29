@@ -116,6 +116,7 @@
     </div>
 
     <script>
+
         let scale = 1.0;
         let lines;
         let amount = 0;
@@ -136,6 +137,8 @@
         document.getElementById("auto_start").addEventListener("click", startTmr);
         document.getElementById("auto_stop").addEventListener("click", stopTmr);
 
+        if (localStorage.getItem(linedata.value) !== null) setCurrent(Number(localStorage.getItem(linedata.value)))
+        next();
         function startTmr() {
             if (!timer) timer = setInterval(next, prd_range.value * 1000);
         }
@@ -143,12 +146,18 @@
             if (timer) clearInterval(timer);
             timer = null;
         }
+
         document.addEventListener('keypress', (event) => {
             if (event.code == 'Space') next();
         }, false);
 
-        function setCurrent() {
-            let val = Number(current.value);
+
+
+        function setCurrent(value = null) {
+            let val;
+            if (value !== null) val = value;
+            else val = Number(current.value);
+            console.log(val);
             if (val < 0) val = 0;
             if (val > lines.length - 1) val = lines.length - 1;
             cur = val;
@@ -274,6 +283,7 @@
             drawLine(cur, R - 2);
             current.value = cur;
             percent.innerHTML = Math.round(cur / lines.length * 100) + '%';
+            localStorage.setItem(linedata.value, cur);
             cur++;
         }
     </script>

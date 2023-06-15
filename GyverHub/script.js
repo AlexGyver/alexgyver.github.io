@@ -13,7 +13,22 @@ function render_main(v){head_cont.innerHTML=`
 </div>
 </div>
 </div>
-`;test_cont.innerHTML=`<div class="test_text">А тут пока ничего нет. Но будет онлайн-тест интерфейса, в котором можно будет поиграться и проверить свой билд без загрузки прошивки</div>`;cli_cont.innerHTML=`
+`;test_cont.innerHTML=`
+<div class="test_text">А тут пока ничего нет. Но будет онлайн-тест интерфейса, в котором можно будет поиграться и проверить свой билд без загрузки прошивки</div>
+`;projects_cont.innerHTML=`
+<div class="projects_inn">
+<div id="projects" class="projects"></div>
+<div class="projects">
+<div class="proj">
+<div class="proj_inn">
+<div class="proj_name">
+<a href="https://github.com/GyverLibs/GyverHub-projects" target="_blank">+ Add Project</a>
+</div>
+</div>
+</div>
+</div>
+</div>
+`;cli_cont.innerHTML=`
 <div class="cli_block">
 <div class="cli_area" id="cli"></div>
 <div class="cli_row">
@@ -24,8 +39,9 @@ function render_main(v){head_cont.innerHTML=`
 </div>
 `;footer_cont.innerHTML=`
 <div class="footer_inner">
-<a href="https://alexgyver.ru/support_alex/" target="_blank"><span class="icon info_icon info_icon_u"></span>Support</a>
-<a style="cursor:pointer" onclick="test_h()"><span class="icon info_icon info_icon_u"></span>Test</a>
+<!--<a href="https://alexgyver.ru/support_alex/" target="_blank"><span class="icon info_icon info_icon_u"></span>Support</a>-->
+<a style="cursor:pointer" onclick="projects_h()"><span class="icon info_icon info_icon_u"></span>Projects</a>
+<a style="cursor:pointer" onclick="test_h()"><span class="icon info_icon info_icon_u"></span>Test</a>
 <a href="https://github.com/GyverLibs/GyverHub/wiki" target="_blank"><span class="icon info_icon info_icon_u"></span>Docs</a>
 </div>
 `;main_cont.innerHTML=`
@@ -331,7 +347,7 @@ Contribution:
 </div>
 <div id="bottom_space"></div>
 `;}
-const app_title='GyverHub';const version_notes='Added Menu + some improvements';const non_esp='__ESP__';const non_app='__APP__';const app_version='0.34b';const log_enable=true;const log_network=false;const info_labels_version={info_lib_v:'Library',info_firm_v:'Firmware',};const info_labels_esp={info_mode:'WiFi Mode',info_ssid:'SSID',info_l_ip:'Local IP',info_ap_ip:'AP IP',info_mac:'MAC',info_rssi:'RSSI',info_uptime:'Uptime',info_heap:'Free Heap',info_sketch:'Sketch (Free)',info_flash:'Flash Size',info_cpu:'Cpu Freq.',};const info_labels_topics={info_id:'ID',info_set:'Set',info_read:'Read',info_get:'Get',info_status:'Status',};const colors={ORANGE:0xd55f30,YELLOW:0xd69d27,GREEN:0x37A93C,MINT:0x25b18f,AQUA:0x2ba1cd,BLUE:0x297bcd,VIOLET:0x825ae7,PINK:0xc8589a,};const fonts=['monospace','system-ui','cursive','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Garamond',];const themes={DARK:0,LIGHT:1};const theme_cols=[['#1b1c20','#26272c','#eee','#ccc','#141516','#444','#0e0e0e','dark','#222','#000'],['#eee','#fff','#111','#333','#ddd','#999','#bdbdbd','light','#fff','#000000a3']];function getMime(name){const mime_table={'avi':'video/x-msvideo','bin':'application/octet-stream','bmp':'image/bmp','css':'text/css','csv':'text/csv','gz':'application/gzip','gif':'image/gif','html':'text/html','jpeg':'image/jpeg','jpg':'image/jpeg','js':'text/javascript','json':'application/json','png':'image/png','svg':'image/svg+xml','txt':'text/plain','wav':'audio/wav','xml':'application/xml',};let ext=name.split('.').pop();if(ext in mime_table)return mime_table[ext];else return'text/plain';}
+const app_title='GyverHub';const version_notes='Added Projects';const non_esp='__ESP__';const non_app='__APP__';const app_version='0.35b';const log_enable=true;const log_network=false;const info_labels_version={info_lib_v:'Library',info_firm_v:'Firmware',};const info_labels_esp={info_mode:'WiFi Mode',info_ssid:'SSID',info_l_ip:'Local IP',info_ap_ip:'AP IP',info_mac:'MAC',info_rssi:'RSSI',info_uptime:'Uptime',info_heap:'Free Heap',info_sketch:'Sketch (Free)',info_flash:'Flash Size',info_cpu:'Cpu Freq.',};const info_labels_topics={info_id:'ID',info_set:'Set',info_read:'Read',info_get:'Get',info_status:'Status',};const colors={ORANGE:0xd55f30,YELLOW:0xd69d27,GREEN:0x37A93C,MINT:0x25b18f,AQUA:0x2ba1cd,BLUE:0x297bcd,VIOLET:0x825ae7,PINK:0xc8589a,};const fonts=['monospace','system-ui','cursive','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Garamond',];const themes={DARK:0,LIGHT:1};const theme_cols=[['#1b1c20','#26272c','#eee','#ccc','#141516','#444','#0e0e0e','dark','#222','#000'],['#eee','#fff','#111','#333','#ddd','#999','#bdbdbd','light','#fff','#000000a3']];function getMime(name){const mime_table={'avi':'video/x-msvideo','bin':'application/octet-stream','bmp':'image/bmp','css':'text/css','csv':'text/csv','gz':'application/gzip','gif':'image/gif','html':'text/html','jpeg':'image/jpeg','jpg':'image/jpeg','js':'text/javascript','json':'application/json','png':'image/png','svg':'image/svg+xml','txt':'text/plain','wav':'audio/wav','xml':'application/xml',};let ext=name.split('.').pop();if(ext in mime_table)return mime_table[ext];else return'text/plain';}
 function EL(id){return document.getElementById(id);}
 function log(text){let texts=text.toString();if(!log_network&&(texts.indexOf('discover')>0||texts.startsWith('Post')||texts.startsWith('Got')))return;console.log(text);}
 function window_ip(){return window.location.href.split('/')[2].split(':')[0];}
@@ -820,7 +836,19 @@ async function pwa_install(ssl){if(ssl&&!isSSL()){if(confirm("Redirect to HTTPS?
 if(!ssl&&isSSL()){if(confirm("Redirect to HTTP"))window.location.href=window.location.href.replace('https:','http:');else return;}
 if(!('serviceWorker'in navigator)){alert('Error');return;}
 if(deferredPrompt!==null){deferredPrompt.prompt();const{outcome}=await deferredPrompt.userChoice;if(outcome==='accepted')deferredPrompt=null;}}
-async function fetchProjects(){try{const response=await fetch("https://raw.githubusercontent.com/GyverLibs/GyverHub-projects/main/projects.txt",{cache:"no-store"});projects=await response.text();log(projects);}catch(e){return;}}
+async function fetchProjects(){try{const response=await fetch("https://raw.githubusercontent.com/GyverLibs/GyverHub-projects/main/projects.txt",{cache:"no-store"});projects=await response.text();}catch(e){return;}}
+async function loadProjects(){const resp=await fetch("https://raw.githubusercontent.com/GyverLibs/GyverHub-projects/main/projects.txt",{cache:"no-store"});let projects=await resp.text();projects=projects.split('\n');for(let proj of projects){if(!proj)continue;let rep=proj.split('https://github.com/')[1];if(!rep)continue;loadProj(rep);}}
+async function loadProj(rep){const resp=await fetch(`https://raw.githubusercontent.com/${rep}/master/project.json`,{cache:"no-store"});let proj=await resp.text();if(proj=='404: Not Found')return;try{proj=JSON.parse(proj);}catch(e){return;}
+if(!('version'in proj)||!('notes'in proj)||!('about'in proj))return;EL('projects').innerHTML+=`
+<div class="proj">
+<div class="proj_inn">
+<div class="proj_name">
+<a href="${'https://github.com/' + rep}" target="_blank" title="Open repository">${rep}</a>
+<a href="https://raw.githubusercontent.com/${rep}/master/bin/firmware.bin" target="_blank" title="Download .bin\n${proj.notes}">v${proj.version}</a></div>
+<div class="proj_about">${proj.about}</div>
+</div>
+</div>
+`;}
 function pass_type(v){pass_inp.value+=v;let hash=pass_inp.value.hashCode();if(pin_id){if(hash==devices[pin_id].PIN){open_device(pin_id);pass_inp.value='';devices_t[pin_id].granted=true;}}else{if(hash==cfg.hub_pin){EL('password').style.display='none';startup();pass_inp.value='';}}}
 function check_type(arg){if(arg.value.length>0){let c=arg.value[arg.value.length-1];if(c<'0'||c>'9')arg.value=arg.value.slice(0,-1);}}
 function show_keypad(v){if(v){EL('password').style.display='block';EL('pass_inp').focus();}else{EL('password').style.display='none';}}
@@ -851,9 +879,10 @@ for(let theme in themes){EL('theme').innerHTML+=`
 for(let i=0;i<33;i++){let imask;if(i==32)imask=0xffffffff;else imask=~(0xffffffff>>>i);EL('netmask').innerHTML+=`
 <option value="${i}">${intToOctets(imask)}</option>`;}}
 function test_h(){show_screen('test');}
+function projects_h(){EL('projects').innerHTML='';show_screen('projects');loadProjects();}
 function refresh_h(){if(screen=='device')post('focus');else if(screen=='info')post('info');else if(screen=='fsbr')post('fsbr');else discover();}
 function back_h(){if(menu_f){menu_deact();menu_show(0);return;}
-switch(screen){case'device':release_all();close_device();break;case'info':show_screen('device');break;case'fsbr':show_screen('device');break;case'config':config_h();break;case'pin':show_screen('main');break;case'test':show_screen('main');break;}}
+switch(screen){case'device':release_all();close_device();break;case'info':show_screen('device');break;case'fsbr':show_screen('device');break;case'config':config_h();break;case'pin':case'projects':case'test':show_screen('main');break;}}
 function config_h(){if(screen=='config'){if(cfg_changed)save_cfg();cfg_changed=false;show_screen('main');discover();}else{show_screen('config');}}
 function menu_show(state){menu_f=state;let cl=EL('menu').classList;if(menu_f)cl.add('menu_show');else cl.remove('menu_show');EL('icon_menu').innerHTML=menu_f?'':'';EL('menu_overlay').style.display=menu_f?'block':'none';}
 function menu_h(){menu_show(!menu_f);}
@@ -866,7 +895,7 @@ log('Open device #'+id+' via '+ConnNames[devices_t[id].conn]);EL('menu_user').in
 function close_device(){showErr(false);switch(devices_t[focused].conn){case Conn.SERIAL:break;case Conn.BT:break;case Conn.WS:ws_stop(focused);refreshSpin(false);break;case Conn.MQTT:post('unfocus');break;}
 log('Close device #'+focused);focused=null;show_screen('main');stop_ping();stop_tout();}
 function clear_all(){EL('devices').innerHTML="";devices={};devices_t={};save_devices();show_screen('main');}
-function show_screen(nscreen){screen=nscreen;stopFS();show_keypad(false);let test_s=EL('test_cont').style;let main_s=EL('main_cont').style;let config_s=EL('config').style;let devices_s=EL('devices').style;let controls_s=EL('controls').style;let info_s=EL('info').style;let fsbr_s=EL('fsbr').style;let icon_cfg_s=EL('icon_cfg').style;let icon_menu_s=EL('icon_menu').style;let icon_refresh_s=EL('icon_refresh').style;let back_s=EL('back').style;let version_s=EL('version').style;let title_row_s=EL('title_row').style;main_s.display='block';test_s.display='none';config_s.display='none';devices_s.display='none';controls_s.display='none';info_s.display='none';icon_menu_s.display='none';icon_cfg_s.display='none';fsbr_s.display='none';back_s.display='none';icon_refresh_s.display='none';version_s.display='none';title_row_s.cursor='pointer';EL('title').innerHTML=app_title;if(screen=='main'){version_s.display='unset';devices_s.display='grid';icon_cfg_s.display='inline-block';icon_refresh_s.display='inline-block';title_row_s.cursor='unset';EL('conn').innerHTML='';showCLI(false);}else if(screen=='test'){main_s.display='none';test_s.display='block';back_s.display='inline-block';EL('title').innerHTML='UI Test';}else if(screen=='device'){controls_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';icon_refresh_s.display='inline-block';EL('title').innerHTML=devices[focused].name;}else if(screen=='config'){config_s.display='block';icon_cfg_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML='Config';}else if(screen=='info'){info_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/info';update_info();}else if(screen=='fsbr'){fsbr_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/fs';}else if(screen=='pin'){back_s.display='inline-block';show_keypad(true);}}
+function show_screen(nscreen){screen=nscreen;stopFS();show_keypad(false);let proj_s=EL('projects_cont').style;let test_s=EL('test_cont').style;let main_s=EL('main_cont').style;let config_s=EL('config').style;let devices_s=EL('devices').style;let controls_s=EL('controls').style;let info_s=EL('info').style;let fsbr_s=EL('fsbr').style;let icon_cfg_s=EL('icon_cfg').style;let icon_menu_s=EL('icon_menu').style;let icon_refresh_s=EL('icon_refresh').style;let back_s=EL('back').style;let version_s=EL('version').style;let title_row_s=EL('title_row').style;main_s.display='block';test_s.display='none';proj_s.display='none';config_s.display='none';devices_s.display='none';controls_s.display='none';info_s.display='none';icon_menu_s.display='none';icon_cfg_s.display='none';fsbr_s.display='none';back_s.display='none';icon_refresh_s.display='none';version_s.display='none';title_row_s.cursor='pointer';EL('title').innerHTML=app_title;if(screen=='main'){version_s.display='unset';devices_s.display='grid';icon_cfg_s.display='inline-block';icon_refresh_s.display='inline-block';title_row_s.cursor='unset';EL('conn').innerHTML='';showCLI(false);}else if(screen=='test'){main_s.display='none';test_s.display='block';back_s.display='inline-block';EL('title').innerHTML='UI Test';}else if(screen=='projects'){main_s.display='none';proj_s.display='block';back_s.display='inline-block';EL('title').innerHTML='Projects';}else if(screen=='device'){controls_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';icon_refresh_s.display='inline-block';EL('title').innerHTML=devices[focused].name;}else if(screen=='config'){config_s.display='block';icon_cfg_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML='Config';}else if(screen=='info'){info_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/info';update_info();}else if(screen=='fsbr'){fsbr_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/fs';}else if(screen=='pin'){back_s.display='inline-block';show_keypad(true);}}
 function delete_h(id){if(confirm('Delete '+id+'?')){document.getElementById("device#"+id).remove();delete devices[id];save_devices();return 1;}
 return 0;}
 function printCLI(text,color){if(EL('cli_cont').style.display=='block'){if(EL('cli').innerHTML)EL('cli').innerHTML+='\n';let st=color?`style="color:${intToCol(color)}"`:'';EL('cli').innerHTML+=`><span ${st}">${text}</span>`;EL('cli').scrollTop=EL('cli').scrollHeight;}}

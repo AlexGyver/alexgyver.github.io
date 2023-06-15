@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    body {
+      font-family: monospace;
+      margin: 0;
+      padding: 0;
+      background: #1b1c20;
+      color: #bbb;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 10px 0;
+    }
+
+    .projects {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      max-width: 700px;
+      margin: auto;
+      padding: 0px 5px;
+    }
+
+    .proj {
+      align-items: center;
+      width: 50%;
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      box-sizing: border-box;
+      min-height: 90px;
+      padding: 5px;
+      width: 100%;
+    }
+
+    .proj_inn {
+      background: #26272c;
+      border-radius: 5px;
+      box-shadow: 0 0 10px 0px #00000020;
+      width: 100%;
+      height: 100%;
+      -webkit-box-sizing: border-box;
+      -moz-box-sizing: border-box;
+      box-sizing: border-box;
+      padding: 7px;
+    }
+
+    .proj_name {
+      font-size: 17px;
+      color: #ccc;
+      font-weight: bold;
+    }
+
+    .proj_about {
+      font-size: 15px;
+    }
+
+    .proj_links {
+      margin-top: 8px;
+    }
+
+    .proj_link {
+      color: #37a93c;
+      font-size: 17px;
+      text-decoration: none;
+    }
+
+    .proj_link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>GyverHub Projects</h1>
+  <div id="projects" class="projects"></div>
+
+  <script>
+    async function begin() {
+      const resp = await fetch("https://raw.githubusercontent.com/GyverLibs/GyverHub-projects/main/projects.txt", { cache: "no-store" });
+      let projects = await resp.text();
+      projects = projects.split('\n');
+      for (let proj of projects) {
+        if (!proj) continue;
+        let rep = proj.split('https://github.com/')[1];
+        if (!rep) continue;
+        loadProj(rep);
+      }
+    }
+
+    async function loadProj(rep) {
+      const resp = await fetch(`https://raw.githubusercontent.com/${rep}/master/project.json`, { cache: "no-store" });
+      let proj = await resp.text();
+      if (proj == '404: Not Found') return;
+      try {
+        proj = JSON.parse(proj);
+      } catch (e) {
+        return;
+      }
+      if (!('version' in proj) || !('notes' in proj) || !('about' in proj)) return;
+      document.getElementById('projects').innerHTML += `
+      <div class="proj">
+        <div class="proj_inn">
+          <div class="proj_name" title="${proj.notes}">${rep} v${proj.version}</div>
+          <div class="proj_about">${proj.about}</div>
+          <div class="proj_links">
+            <a class="proj_link" href="${'https://github.com/' + rep}" target="_blank">GitHub</a>
+            <a class="proj_link" href="https://raw.githubusercontent.com/${rep}/master/bin/firmware.bin" target="_blank">bin</a>
+          </div>
+        </div>
+      </div>
+      `;
+    }
+
+    begin();
+  </script>
+</body>
+
+</html>

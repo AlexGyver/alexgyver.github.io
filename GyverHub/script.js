@@ -1,12 +1,56 @@
-function render_main(v){head_cont.innerHTML=`
+function getMaskList(){let list=[];for(let i=0;i<33;i++){let imask;if(i==32)imask=0xffffffff;else imask=~(0xffffffff>>>i);list.push(`${(imask >>> 24) & 0xff}.${(imask >>> 16) & 0xff}.${(imask >>> 8) & 0xff}.${imask & 0xff}`);}
+return list;}
+String.prototype.hashCode=function(){if(!this.length)return 0;let hash=new Uint32Array(1);for(let i=0;i<this.length;i++){hash[0]=((hash[0]<<5)-hash[0])+this.charCodeAt(i);}
+return hash[0];}
+class GyverHub{cfg={prefix:'MyDevices',client_id:new Date().getTime().toString(16).slice(-8),use_ws:false,use_hook:true,local_ip:'192.168.1.1',netmask:24,use_bt:false,use_serial:false,ser_baud:115200,use_mqtt:false,mq_host:'test.mosquitto.org',mq_port:'8081',mq_login:'',mq_pass:'',};bt=new Bluetooth();ser=new Serial();}
+class Serial{onmessage(data){}
+onopen(){}
+onclose(){}
+onerror(e){}
+onchange(){}
+state(){return this.lock;}
+port=null;lock=false;reader=null;async select(){await this.close();const ports=await navigator.serial.getPorts();for(let port of ports)await port.forget();try{await navigator.serial.requestPort();this.onchange(true);}catch(e){this.onerror('[Serial] '+e);this.onchange(false);}}
+async start(baud){if(this.lock)return this.onerror("[Serial] Already open");try{this.lock=true;const ports=await navigator.serial.getPorts();if(!ports.length)return this.onerror("[Serial] No port");this.port=ports[0];await this.port.open({baudRate:baud});this.onopen();while(this.port.readable){this.reader=this.port.readable.getReader();try{while(true&&this.lock){const{value,done}=await this.reader.read();if(done)break;const data=new TextDecoder().decode(value);this.onmessage(data);}}catch(e){this.onerror('[Serial] '+e);}finally{await this.reader.releaseLock();await this.port.close();this.onclose();break;}}}catch(e){this.onerror('[Serial] '+e);}
+this.reader=null;this.lock=false;}
+close(){if(this.reader)this.reader.cancel();this.lock=false;}
+async send(text){if(!this.lock)return this.onerror("[Serial] Not open");try{const encoder=new TextEncoder();const writer=this.port.writable.getWriter();await writer.write(encoder.encode(text+'\0'));writer.releaseLock();}catch(e){this.onerror('[Serial] '+e);}}}
+class Bluetooth{constructor(){this._maxCharacteristicValueLength=20;this._device=null;this._characteristic=null;this._serviceUuid=0xFFE0;this._characteristicUuid=0xFFE1;this._boundHandleDisconnection=this._handleDisconnection.bind(this);this._boundHandleCharacteristicValueChanged=this._handleCharacteristicValueChanged.bind(this);}
+onmessage(data){}
+onopen(){}
+onclose(){}
+onerror(text){}
+state(){return(this._device);}
+open(){return this._connectToDevice(this._device).then(()=>{this.onopen();}).catch(e=>{this.onerror('[BT] '+e);});}
+close(){this._disconnectFromDevice(this._device);if(this._characteristic){this._characteristic.removeEventListener('characteristicvaluechanged',this._boundHandleCharacteristicValueChanged);this._characteristic=null;}
+if(this._device)this.onclose();this._device=null;}
+send(data){if(!this._characteristic)return this.onerror('[BT] No device');data+='\0';const chunks=this.constructor._splitByLength(data,this._maxCharacteristicValueLength);let promise=this._writeToCharacteristic(this._characteristic,chunks[0]);for(let i=1;i<chunks.length;i++){promise=promise.then(()=>new Promise((resolve,reject)=>{if(!this._characteristic){reject(new Error('Device has been disconnected'));}
+this._writeToCharacteristic(this._characteristic,chunks[i]).then(resolve).catch(reject);}));}
+return promise;}
+getName(){return this._device?this._device.name:'';}
+_connectToDevice(device){return(device?Promise.resolve(device):this._requestBluetoothDevice()).then((device)=>this._connectDeviceAndCacheCharacteristic(device)).then((characteristic)=>this._startNotifications(characteristic)).catch((error)=>{this.onerror('[BT] '+error);return Promise.reject(error);});}
+_disconnectFromDevice(device){if(!device)return;device.removeEventListener('gattserverdisconnected',this._boundHandleDisconnection);if(!device.gatt.connected)return;device.gatt.disconnect();}
+_requestBluetoothDevice(){return navigator.bluetooth.requestDevice({filters:[{services:[this._serviceUuid]}],}).then((device)=>{this._device=device;this._device.addEventListener('gattserverdisconnected',this._boundHandleDisconnection);return this._device;});}
+_connectDeviceAndCacheCharacteristic(device){if(device.gatt.connected&&this._characteristic){return Promise.resolve(this._characteristic);}
+return device.gatt.connect().then((server)=>{return server.getPrimaryService(this._serviceUuid);}).then((service)=>{return service.getCharacteristic(this._characteristicUuid);}).then((characteristic)=>{this._characteristic=characteristic;return this._characteristic;});}
+_startNotifications(characteristic){return characteristic.startNotifications().then(()=>{characteristic.addEventListener('characteristicvaluechanged',this._boundHandleCharacteristicValueChanged);});}
+_stopNotifications(characteristic){return characteristic.stopNotifications().then(()=>{characteristic.removeEventListener('characteristicvaluechanged',this._boundHandleCharacteristicValueChanged);});}
+_handleDisconnection(event){const device=event.target;this.onclose();this._connectDeviceAndCacheCharacteristic(device).then((characteristic)=>this._startNotifications(characteristic)).then(()=>{this.onopen();}).catch((error)=>this.onerror('[BT] '+error));}
+_handleCharacteristicValueChanged(event){const value=new TextDecoder().decode(event.target.value);this.onmessage(value);}
+_writeToCharacteristic(characteristic,data){return characteristic.writeValue(new TextEncoder().encode(data));}
+static _splitByLength(string,length){return string.match(new RegExp('(.|[\r\n]){1,'+length+'}','g'));}}
+let hub=new GyverHub();function render_main(v){head_cont.innerHTML=`
 <div class="title" id="title_cont">
 <div class="title_inn">
 <div id="title_row" class="title_row" onclick="back_h()">
 <span class="icon i_hover back_btn" id="back"></span>
 <span><span id="title"></span><sup id="conn"></sup><span class='version' id='version'>${v}</span></span>
 </div>
+<div id="conn_icons" style="display:flex">
+<span id='mqtt_ok' style="display:none;margin:0" class="icon cfg_icon"></span>
+<span id='serial_ok' style="display:none;margin:0" class="icon cfg_icon"></span>
+<span id='bt_ok' style="display:none;margin:0" class="icon cfg_icon"></span>
+</div>
 <div class="head_btns">
-<span id='head_err' style="display:none"><strike>MQTT</strike></span>
 <span class="icon i_hover" id='icon_refresh' onclick="refresh_h()"></span>
 <span class="icon i_hover" id='icon_cfg' style="display:none" onclick="config_h()"></span>
 <span class="icon i_hover" id='icon_menu' style="display:none" onclick="menu_h()"></span>
@@ -42,7 +86,7 @@ function render_main(v){head_cont.innerHTML=`
 <!--<a href="https://alexgyver.ru/support_alex/" target="_blank"><span class="icon info_icon info_icon_u"></span>Support</a>-->
 <a style="cursor:pointer" onclick="projects_h()"><span class="icon info_icon info_icon_u"></span>Projects</a>
 <a style="cursor:pointer" onclick="test_h()"><span class="icon info_icon info_icon_u"></span>Test</a>
-<a href="https://github.com/GyverLibs/GyverHub/wiki" target="_blank"><span class="icon info_icon info_icon_u"></span>Docs</a>
+<a href="https://github.com/GyverLibs/GyverHub/wiki" target="_blank"><span class="icon info_icon info_icon_u"></span>Wiki</a>
 </div>
 `;main_cont.innerHTML=`
 <div id="menu_overlay" onclick="menu_show(0)"></div>
@@ -78,20 +122,55 @@ function render_main(v){head_cont.innerHTML=`
 <label class="switch"><input type="checkbox" id="info_names_sw" onchange="devices[focused].show_names=this.checked;save_devices()">
 <span class="slider"></span></label>
 </div>
+<div class="cfg_row">
+<button id="reboot_btn" class="c_btn btn_mini" onclick="reboot_h()"><span class="icon info_icon"></span>Reboot</button>
+</div>
 </div>
 <div class="cfg_col" id="info_topics">
 <div class="cfg_row cfg_head">
 <label><span class="icon cfg_icon"></span>Topics</label>
 </div>
 </div>
-<div class="cfg_col" id="info_version">
+<div class="cfg_col">
 <div class="cfg_row cfg_head">
 <label><span class="icon cfg_icon"></span>Version</label>
 </div>
+<div id="info_version"></div>
 </div>
-<div class="cfg_col" id="info_esp">
+<div class="cfg_col">
 <div class="cfg_row cfg_head">
-<label><span class="icon cfg_icon"></span>ESP info</label>
+<label><span class="icon cfg_icon"></span>Network</label>
+</div>
+<div id="info_net"></div>
+</div>
+<div class="cfg_col">
+<div class="cfg_row cfg_head">
+<label><span class="icon cfg_icon"></span>Memory</label>
+</div>
+<div id="info_memory"></div>
+</div>
+<div class="cfg_col">
+<div class="cfg_row cfg_head">
+<label><span class="icon cfg_icon"></span>System</label>
+</div>
+<div id="info_system"></div>
+</div>
+</div>
+<div id="fsbr_edit" class="main_col">
+<div class="cfg_col">
+<div class="cfg_row cfg_head">
+<label><span class="icon cfg_icon"></span>Editor</label>
+</div>
+<div class="cfg_row">
+<label>Wrap text</label>
+<label class="switch"><input type="checkbox" id="editor_wrap" onchange="this.checked?editor_area.classList.remove('c_area_wrap'):editor_area.classList.add('c_area_wrap')"><span class="slider"></span></label>
+</div>
+<div class="cfg_row">
+<textarea rows=20 id="editor_area" class="cfg_inp c_log c_area_wrap"></textarea>
+</div>
+<div class="cfg_row">
+<button id="editor_save" onclick="editor_save()" class="c_btn btn_mini">Save & Upload</button>
+<button onclick="editor_cancel()" class="c_btn btn_mini">Cancel</button>
 </div>
 </div>
 </div>
@@ -100,62 +179,73 @@ function render_main(v){head_cont.innerHTML=`
 <div class="cfg_row cfg_head">
 <label><span class="icon cfg_icon"></span>FS Browser</label>
 </div>
+<div id="fs_browser">
 <div id="fsbr_inner"></div>
 <div class="cfg_row">
-<button onclick="format_h()" class="c_btn btn_mini">Format</button>
+<div>
+<button id="fs_format" onclick="format_h()" class="c_btn btn_mini">Format</button>
+<button id="fs_update" onclick="updatefs_h()" class="c_btn btn_mini">Update</button>
+</div>
+</div>
 </div>
 </div>
 <div class="cfg_col">
 <div class="cfg_row cfg_head">
 <label><span class="icon cfg_icon"></span>Upload</label>
 </div>
+<div id="fs_upload">
 <div class="upload_row">
-<input class="cfg_inp" type="text" id="file_upload_path" value="/">
-<input type="file" id="file_upload" style="display:none" onchange="uploadFile(this)">
+<input class="cfg_inp inp_wbtn" type="text" id="file_upload_path" value="/">
+<input type="file" id="file_upload" style="display:none" onchange="uploadFile(this.files[0], file_upload_path.value)">
 <button id="file_upload_btn" onclick="file_upload.click()" class="c_btn upl_button">Upload</button>
+</div>
 </div>
 </div>
 <div class="cfg_col">
 <div class="cfg_row cfg_head">
 <label><span class="icon cfg_icon"></span>OTA FILE</label>
 </div>
+<div id="fs_otaf">
 <div class="cfg_row">
 <div>
-<input type="file" id="ota_upload" style="display:none" onchange="uploadOta(this, 'flash')">
-<button onclick="ota_upload.click()" class="c_btn btn_mini">Flash</button>
-<input type="file" id="ota_upload_fs" style="display:none" onchange="uploadOta(this, 'fs')">
-<button onclick="ota_upload_fs.click()" class="c_btn btn_mini">Filesystem</button>
+<input type="file" id="ota_upload" style="display:none" onchange="uploadOta(this.files[0], 'flash')">
+<button onclick="ota_upload.click()" class="c_btn btn_mini drop_area" ondrop="uploadOta(event.dataTransfer.files[0], 'flash')">Flash</button>
+<input type="file" id="ota_upload_fs" style="display:none" onchange="uploadOta(this.files[0], 'fs')">
+<button onclick="ota_upload_fs.click()" class="c_btn btn_mini drop_area" ondrop="uploadOta(event.dataTransfer.files[0], 'fs')">Filesystem</button>
 </div>
 <label style="font-size:18px" id="ota_label">IDLE</label>
+</div>
 </div>
 </div>
 <div class="cfg_col">
 <div class="cfg_row cfg_head">
 <label><span class="icon cfg_icon"></span>OTA URL</label>
 </div>
+<div id="fs_otaurl">
 <div class="upload_row">
-<input class="cfg_inp" type="text" id="ota_url_f">
+<input class="cfg_inp inp_wbtn" type="text" id="ota_url_f">
 <button id="ota_url_btn" onclick="otaUrl(ota_url_f.value,'flash')" class="c_btn upl_button">Flash</button>
 </div>
 <div class="upload_row">
-<input class="cfg_inp" type="text" id="ota_url_fs">
+<input class="cfg_inp inp_wbtn" type="text" id="ota_url_fs">
 <button id="ota_url_btn" onclick="otaUrl(ota_url_fs.value,'fs')" class="c_btn upl_button">FS</button>
+</div>
 </div>
 </div>
 </div>
 <div id="config" class="cfg_in">
 <div class="cfg_col">
 <div class="cfg_row cfg_head">
-<label><span class="icon cfg_icon"></span>Search</label>
+<label class="cfg_label"><span class="icon cfg_icon"></span>Search</label>
 <div>
 <button class="icon cfg_btn_tab" onclick="discover_all()" title="Find new devices"></button>
 </div>
 </div>
 </div>
 <div class="cfg_col">
-<div class="cfg_row cfg_head">
-<label id="ws_label"><span class="icon cfg_icon"></span>WS</label>
-<label class="switch"><input type="checkbox" id="use_ws" onchange="update_cfg(this)"><span class="slider"></span></label>
+<div class="cfg_row cfg_head cfg_clickable" onclick="use_ws.click()">
+<label class="cfg_label cfg_clickable" id="ws_label"><span class="icon cfg_icon"></span>WS</label>
+<input type="checkbox" id="use_ws" onchange="update_cfg(this)" style="display:none">
 </div>
 <div id="ws_block" style="display:none">
 <div class="cfg_row" id="http_only_http" style="display:none">
@@ -165,9 +255,9 @@ function render_main(v){head_cont.innerHTML=`
 <div class="cfg_row">
 <label class="cfg_label">My IP</label>
 <div class="cfg_inp_row cfg_inp_row_fix">
-<input class="cfg_inp" type="text" id="client_ip" onchange="update_cfg(this)">
+<input class="cfg_inp" type="text" id="local_ip" onchange="update_cfg(this)">
 <div class="cfg_btn_block">
-<button class="icon cfg_btn" onclick="update_ip_h();update_cfg(EL('client_ip'))"></button>
+<button class="icon cfg_btn" onclick="update_ip_h();update_cfg(EL('local_ip'))"></button>
 </div>
 </div>
 </div>
@@ -196,50 +286,69 @@ function render_main(v){head_cont.innerHTML=`
 </div>
 <!--NON-ESP-->
 <div class="cfg_col" id="mq_col">
-<div class="cfg_row cfg_head">
-<label id="mqtt_label"><span class="icon cfg_icon"></span>MQTT</label>
-<label class="switch"><input type="checkbox" id="use_mqtt" onchange="update_cfg(this);mq_change(this.checked)"><span class="slider"></span></label>
+<div class="cfg_row cfg_head cfg_clickable" onclick="use_mqtt.click()">
+<label class="cfg_label cfg_clickable" id="mqtt_label"><span class="icon cfg_icon"></span>MQTT</label>
+<input type="checkbox" id="use_mqtt" onchange="update_cfg(this);mq_stop()" style="display:none">
 </div>
 <div id="mq_block" style="display:none">
 <div class="cfg_row">
 <label class="cfg_label">Host</label>
-<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="text" id="mq_host" onchange="update_cfg(this);mq_change()"></div>
+<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="text" id="mq_host" onchange="update_cfg(this);mq_stop()"></div>
 </div>
 <div class="cfg_row">
 <label class="cfg_label">Port (WS TLS)</label>
-<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="number" id="mq_port" onchange="update_cfg(this);mq_change()"></div>
+<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="number" id="mq_port" onchange="update_cfg(this);mq_stop()"></div>
 </div>
 <div class="cfg_row">
 <label class="cfg_label">Login</label>
-<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="text" id="mq_login" onchange="update_cfg(this);mq_change()"></div>
+<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="text" id="mq_login" onchange="update_cfg(this);mq_stop()"></div>
 </div>
 <div class="cfg_row">
 <label class="cfg_label">Pass</label>
-<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="password" id="mq_pass" onchange="update_cfg(this);mq_change()">
+<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="password" id="mq_pass" onchange="update_cfg(this);mq_stop()">
+</div>
+</div>
+<div class="cfg_btn_row">
+<button class="c_btn btn_mini" onclick="mq_start()">Connect</button>
+<button class="c_btn btn_mini" onclick="mq_stop()">Disconnect</button>
 </div>
 </div>
 </div>
-</div>
-<div class="cfg_col" id="serial_col" style="display:none">
-<div class="cfg_row cfg_head">
-<label id="serial_label"><span class="icon cfg_icon"></span>Serial</label>
-<label class="switch"><input type="checkbox" id="use_serial" onchange="update_cfg(this)"><span class="slider"></span></label>
+<div class="cfg_col" id="serial_col" ${("serial" in navigator) ? '' : 'style="display:none"'}>
+<div class="cfg_row cfg_head cfg_clickable" onclick="use_serial.click()">
+<label class="cfg_label cfg_clickable" id="serial_label"><span class="icon cfg_icon"></span>Serial</label>
+<input type="checkbox" id="use_serial" onchange="serial_change();update_cfg(this)" style="display:none">
 </div>
 <div id="serial_block" style="display:none">
+<div class="cfg_row">
+<label class="cfg_label">Baudrate</label>
+<select class="cfg_inp c_inp_block с_inp_fix" id='baudrate' onchange="update_cfg(this)"></select>
+</div>
+<div class="cfg_row">
+<label class="cfg_label">Port</label>
+<div class="cfg_btn_row">
+<button class="c_btn btn_mini" onclick="serial_select()">Select</button>
+<button id="serial_btn" class="c_btn btn_mini" onclick="serial_toggle()">Connect</button>
 </div>
 </div>
-<div class="cfg_col" id="bt_col" style="display:none">
-<div class="cfg_row cfg_head">
-<label id="bt_label"><span class="icon cfg_icon"></span>Bluetooth</label>
-<label class="switch"><input type="checkbox" id="use_bt" onchange="update_cfg(this)"><span class="slider"></span></label>
+</div>
+</div>
+<div class="cfg_col" id="bt_col" ${("bluetooth" in navigator) ? '' : 'style="display:none"'}>
+<div class="cfg_row cfg_head cfg_clickable" onclick="use_bt.click()">
+<label class="cfg_label cfg_clickable" id="bt_label"><span class="icon cfg_icon"></span>Bluetooth</label>
+<input type="checkbox" id="use_bt" onchange="update_cfg(this)" style="display:none">
 </div>
 <div id="bt_block" style="display:none">
+<div class="cfg_row">
+<label class="cfg_label" id="bt_device">Not Connected</label>
+<button id="bt_btn" class="c_btn btn_mini" onclick="bt_toggle()">Connect</button>
+</div>
 </div>
 </div>
 <!--/NON-ESP-->
 <div class="cfg_col">
 <div class="cfg_row cfg_head">
-<label><span class="icon cfg_icon"></span>Settings</label>
+<label class="cfg_label"><span class="icon cfg_icon"></span>Settings</label>
 </div>
 <div class="cfg_row">
 <label class="cfg_label">Prefix</label>
@@ -249,7 +358,7 @@ function render_main(v){head_cont.innerHTML=`
 </div>
 <div class="cfg_row">
 <label class="cfg_label">Client ID</label>
-<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="text" id="hub_id" onchange="update_cfg(this)" oninput="if(this.value.length>8)this.value=this.value.slice(0,-1)">
+<div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="text" id="client_id" onchange="update_cfg(this)" oninput="if(this.value.length>8)this.value=this.value.slice(0,-1)">
 </div>
 </div>
 <div class="cfg_row">
@@ -267,7 +376,7 @@ function render_main(v){head_cont.innerHTML=`
 <div class="cfg_row">
 <label class="cfg_label">UI Width</label>
 <div class="cfg_inp_row cfg_inp_row_fix">
-<input class="cfg_inp" type="number" id="ui_width" onchange="update_cfg(this);updateTheme()">
+<input class="cfg_inp" type="number" id="ui_width" onchange="update_cfg(this);update_theme()">
 </div>
 </div>
 <div class="cfg_row">
@@ -276,31 +385,31 @@ function render_main(v){head_cont.innerHTML=`
 </div>
 <div class="cfg_row">
 <label class="cfg_label">Settings</label>
-<div>
+<div class="cfg_btn_row">
 <button class="c_btn btn_mini" onclick="cfg_export()">Export</button>
 <button class="c_btn btn_mini" onclick="cfg_import()">Import</button>
 </div>
 </div>
 </div>
 <div class="cfg_col">
-<div class="cfg_row cfg_head">
-<label id="pin_label"><span class="icon cfg_icon"></span>PIN</label>
-<label class="switch"><input type="checkbox" id="use_pin" onchange="update_cfg(this)"><span class="slider"></span></label>
+<div class="cfg_row cfg_head cfg_clickable" onclick="use_pin.click()">
+<label id="pin_label" class="cfg_label cfg_clickable"><span class="icon cfg_icon"></span>PIN</label>
+<input type="checkbox" id="use_pin" onchange="update_cfg(this)" style="display:none">
 </div>
 <div id="pin_block" style="display:none">
 <div class="cfg_row">
 <label class="cfg_label">PIN</label>
 <div class="cfg_inp_row cfg_inp_row_fix"><input class="cfg_inp" type="password" pattern="[0-9]*" inputmode="numeric"
-id="hub_pin" onchange="this.value=this.value.hashCode();update_cfg(this)" oninput="check_type(this)">
+id="pin" onchange="this.value=this.value.hashCode();update_cfg(this)" oninput="check_type(this)">
 </div>
 </div>
 </div>
 </div>
 <!--NON-ESP-->
-<div class="cfg_col" id="app_block">
+<div class="cfg_col" id="pwa_block">
 <div class="cfg_row cfg_head">
-<label><span class="icon cfg_icon"></span>App</label>
-<div>
+<label class="cfg_label"><span class="icon cfg_icon"></span>Web App</label>
+<div class="cfg_btn_row">
 <button class="c_btn btn_mini ${isSSL() ? 'info_btn_dis' : ''}" onclick="pwa_install(false)">HTTP</button>
 <button class="c_btn btn_mini ${!isSSL() ? 'info_btn_dis' : ''}" onclick="pwa_install(true)">HTTPS</button>
 </div>
@@ -309,13 +418,22 @@ id="hub_pin" onchange="this.value=this.value.hashCode();update_cfg(this)" oninpu
 <span class="notice_block" id="pwa_unsafe">Enable <u>${browser()}://flags/#unsafely-treat-insecure-origin-as-secure</u> and add <u>${window.location.href}</u> to list</span>
 </div>
 <!--/NON-ESP-->
+<div class="cfg_col" id="app_block">
+<div class="cfg_row cfg_head">
+<label class="cfg_label"><span class="icon cfg_icon"></span>App</label>
+<div class="cfg_btn_row">
+<button class="c_btn btn_mini" onclick="openURL('https://play.google.com/store/apps/details?id=ru.alexgyver.GyverHub')">Android</button>
+<button class="c_btn btn_mini" onclick="openURL('https://github.com/GyverLibs/GyverHub/raw/main/app/GyverHub.apk')">.apk</button>
+</div>
+</div>
+</div>
 <div class="cfg_col">
 <div class="cfg_info">
 Contribution:
 <a href="https://github.com/Simonwep/pickr" target="_blank">Pickr</a>
 <a href="https://github.com/mqttjs/MQTT.js" target="_blank">MQTT.js</a>
 <a href="https://github.com/ghornich/sort-paths" target="_blank">sort-paths</a>
-<a href="https://fontawesome.com/v5/cheatsheet/free/solid" target="_blank">Fontawesome</a>
+<a href="https://fontawesome.com/v5/search?o=r&m=free&s=solid" target="_blank">Fontawesome</a>
 </div>
 </div>
 </div>
@@ -347,19 +465,17 @@ Contribution:
 </div>
 <div id="bottom_space"></div>
 `;}
-const app_title='GyverHub';const version_notes='Added Projects';const non_esp='__ESP__';const non_app='__APP__';const app_version='0.35b';const log_enable=true;const log_network=false;const info_labels_version={info_lib_v:'Library',info_firm_v:'Firmware',};const info_labels_esp={info_mode:'WiFi Mode',info_ssid:'SSID',info_l_ip:'Local IP',info_ap_ip:'AP IP',info_mac:'MAC',info_rssi:'RSSI',info_uptime:'Uptime',info_heap:'Free Heap',info_sketch:'Sketch (Free)',info_flash:'Flash Size',info_cpu:'Cpu Freq.',};const info_labels_topics={info_id:'ID',info_set:'Set',info_read:'Read',info_get:'Get',info_status:'Status',};const colors={ORANGE:0xd55f30,YELLOW:0xd69d27,GREEN:0x37A93C,MINT:0x25b18f,AQUA:0x2ba1cd,BLUE:0x297bcd,VIOLET:0x825ae7,PINK:0xc8589a,};const fonts=['monospace','system-ui','cursive','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Garamond',];const themes={DARK:0,LIGHT:1};const theme_cols=[['#1b1c20','#26272c','#eee','#ccc','#141516','#444','#0e0e0e','dark','#222','#000'],['#eee','#fff','#111','#333','#ddd','#999','#bdbdbd','light','#fff','#000000a3']];function getMime(name){const mime_table={'avi':'video/x-msvideo','bin':'application/octet-stream','bmp':'image/bmp','css':'text/css','csv':'text/csv','gz':'application/gzip','gif':'image/gif','html':'text/html','jpeg':'image/jpeg','jpg':'image/jpeg','js':'text/javascript','json':'application/json','png':'image/png','svg':'image/svg+xml','txt':'text/plain','wav':'audio/wav','xml':'application/xml',};let ext=name.split('.').pop();if(ext in mime_table)return mime_table[ext];else return'text/plain';}
-function EL(id){return document.getElementById(id);}
-function log(text){let texts=text.toString();if(!log_network&&(texts.indexOf('discover')>0||texts.startsWith('Post')||texts.startsWith('Got')))return;console.log(text);}
-function window_ip(){return window.location.href.split('/')[2].split(':')[0];}
-function openURL(url){window.open(url,'_blank').focus();}
-function isSSL(){return window.location.protocol=='https:';}
+const app_title='GyverHub';const non_esp='__ESP__';const non_app='__APP__';const app_version='0.47b';const log_enable=true;const log_network=false;const colors={ORANGE:0xd55f30,YELLOW:0xd69d27,GREEN:0x37A93C,MINT:0x25b18f,AQUA:0x2ba1cd,BLUE:0x297bcd,VIOLET:0x825ae7,PINK:0xc8589a,};const fonts=['monospace','system-ui','cursive','Arial','Verdana','Tahoma','Trebuchet MS','Georgia','Garamond',];const themes={DARK:0,LIGHT:1};const baudrates=[4800,9600,19200,38400,57600,74880,115200,230400,250000,500000,1000000,2000000];const theme_cols=[['#1b1c20','#26272c','#eee','#ccc','#141516','#444','#0e0e0e','dark','#222','#000'],['#eee','#fff','#111','#333','#ddd','#999','#bdbdbd','light','#fff','#000000a3']];function isSSL(){return window.location.protocol=='https:';}
 function isLocal(){return window.location.href.startsWith('file')||checkIP(window_ip())||window_ip()=='localhost';}
 function isApp(){return!non_app;}
 function isPWA(){return(window.matchMedia('(display-mode: standalone)').matches)||(window.navigator.standalone)||document.referrer.includes('android-app://');}
 function isESP(){return!non_esp;}
 function isTouch(){return navigator.maxTouchPoints||'ontouchstart'in document.documentElement;}
-String.prototype.hashCode=function(){if(!this.length)return 0;let hash=new Uint32Array(1);for(let i=0;i<this.length;i++){hash[0]=((hash[0]<<5)-hash[0])+this.charCodeAt(i);}
-return hash[0];}
+function getMime(name){const mime_table={'avi':'video/x-msvideo','bin':'application/octet-stream','bmp':'image/bmp','css':'text/css','csv':'text/csv','gz':'application/gzip','gif':'image/gif','html':'text/html','jpeg':'image/jpeg','jpg':'image/jpeg','js':'text/javascript','json':'application/json','png':'image/png','svg':'image/svg+xml','txt':'text/plain','wav':'audio/wav','xml':'application/xml',};let ext=name.split('.').pop();if(ext in mime_table)return mime_table[ext];else return'text/plain';}
+function EL(id){return document.getElementById(id);}
+function log(text){let texts=text.toString();if(!log_network&&(texts.includes('discover')||texts.startsWith('Post')||texts.startsWith('Got')))return;console.log(text);}
+function window_ip(){return window.location.href.split('/')[2].split(':')[0];}
+function openURL(url){window.open(url,'_blank').focus();}
 function intToCol(val){return"#"+Number(val).toString(16).padStart(6,'0');}
 function intToColA(val){return"#"+Number(val).toString(16).padStart(8,'0');}
 function colToInt(str){return parseInt(str.substr(1),16);}
@@ -367,7 +483,7 @@ function random(min,max){return Math.floor(Math.random()*(max-min+1)+min)}
 function randomChar(){let code;switch(random(0,2)){case 0:code=random(48,57);break;case 1:code=random(65,90);break;case 2:code=random(97,122);break;}
 return String.fromCharCode(code);}
 function notSupported(){alert('Browser not supported');}
-function browser(){if(navigator.userAgent.indexOf("Opera")!=-1||navigator.userAgent.indexOf('OPR')!=-1)return'opera';else if(navigator.userAgent.indexOf("Edg")!=-1)return'edge';else if(navigator.userAgent.indexOf("Chrome")!=-1)return'chrome';else if(navigator.userAgent.indexOf("Safari")!=-1)return'safari';else if(navigator.userAgent.indexOf("Firefox")!=-1)return'firefox';else if((navigator.userAgent.indexOf("MSIE")!=-1)||(!!document.documentMode==true))return'IE';else return'unknown';}
+function browser(){if(navigator.userAgent.includes("Opera")||navigator.userAgent.includes('OPR'))return'opera';else if(navigator.userAgent.includes("Edg"))return'edge';else if(navigator.userAgent.includes("Chrome"))return'chrome';else if(navigator.userAgent.includes("Safari"))return'safari';else if(navigator.userAgent.includes("Firefox"))return'firefox';else if((navigator.userAgent.includes("MSIE"))||(!!document.documentMode==true))return'IE';else return'unknown';}
 function disableScroll(){TopScroll=window.pageYOffset||document.documentElement.scrollTop;LeftScroll=window.pageXOffset||document.documentElement.scrollLeft,window.onscroll=function(){window.scrollTo(LeftScroll,TopScroll);};}
 function enableScroll(){window.onscroll=function(){};}
 function refreshSpin(val){if(val)EL('icon_refresh').classList.add('spinning');else EL('icon_refresh').classList.remove('spinning');}
@@ -377,28 +493,35 @@ let popupT1=null,popupT2=null;function showPopup(text,color='#37a93c'){if(popupT
 function showPopupError(text){showPopup(text,'#a93737');}
 function showErr(v){EL('head_cont').style.background=v?'var(--err)':'var(--prim)';}
 function getLocalIP(){return new Promise(function(resolve,reject){var RTCPeerConnection=window.webkitRTCPeerConnection||window.mozRTCPeerConnection;if(!RTCPeerConnection)reject('Not supported');var rtc=new RTCPeerConnection({iceServers:[]});var addrs={};addrs["0.0.0.0"]=false;function grepSDP(sdp){var hosts=[];var finalIP='';sdp.split('\r\n').forEach(function(line){if(~line.indexOf("a=candidate")){var parts=line.split(' '),addr=parts[4],type=parts[7];if(type==='host'){finalIP=addr;}}else if(~line.indexOf("c=")){var parts=line.split(' '),addr=parts[2];finalIP=addr;}});return finalIP;}
-if(1||window.mozRTCPeerConnection){rtc.createDataChannel('',{reliable:false});};rtc.onicecandidate=function(evt){if(evt.candidate){var addr=grepSDP("a="+evt.candidate.candidate);resolve(addr);}};rtc.createOffer(function(offerDesc){rtc.setLocalDescription(offerDesc);},function(e){return;});});return window_ip();}
-function update_ip_h(){if(!Boolean(window.webkitRTCPeerConnection||window.mozRTCPeerConnection))notSupported();else getLocalIP().then((ip)=>{if(ip.indexOf("local")>0)alert(`Disable WEB RTC anonymizer: ${browser()}://flags/#enable-webrtc-hide-local-ips-with-mdns`);else EL('client_ip').value=ip;});}
-function update_ip(){if(!Boolean(window.webkitRTCPeerConnection||window.mozRTCPeerConnection))return;getLocalIP().then((ip)=>{if(ip.indexOf("local")<0){EL('client_ip').value=ip;cfg.client_ip=ip;}});}
+if(1||window.mozRTCPeerConnection){rtc.createDataChannel('',{reliable:false});};rtc.onicecandidate=function(evt){if(evt.candidate){var addr=grepSDP("a="+evt.candidate.candidate);resolve(addr);}};rtc.createOffer(function(offerDesc){rtc.setLocalDescription(offerDesc);},function(e){return;});});}
+function update_ip_h(){if(!Boolean(window.webkitRTCPeerConnection||window.mozRTCPeerConnection))notSupported();else getLocalIP().then((ip)=>{if(ip.indexOf("local")>0)alert(`Disable WEB RTC anonymizer: ${browser()}://flags/#enable-webrtc-hide-local-ips-with-mdns`);else EL('local_ip').value=ip;});if(isESP())EL('local_ip').value=window_ip();}
 function checkIP(ip){return Boolean(ip.match(/^((25[0-5]|(2[0-4]|1[0-9]|[1-9]|)[0-9])(\.(?!$)|$)){4}$/));}
-function intToOctets(ip){let o1=(ip>>>24)&0xff;let o2=(ip>>>16)&0xff;let o3=(ip>>>8)&0xff;let o4=ip&0xff;return(o1+'.'+o2+'.'+o3+'.'+o4);}
-function getIPs(){let ip=EL('client_ip').value;if(!checkIP(ip)){showPopupError('Wrong IP!');return null;}
-let ip_a=ip.split('.');let sum_ip=(ip_a[0]<<24)|(ip_a[1]<<16)|(ip_a[2]<<8)|ip_a[3];let cidr=Number(EL('netmask').value);let mask=~(0xffffffff>>>cidr);let network=0,broadcast=0,start_ip=0,end_ip=0;if(cidr===32){network=sum_ip;broadcast=network;start_ip=network;end_ip=network;}else{network=sum_ip&mask;broadcast=network+(~mask);if(cidr===31){start_ip=network;end_ip=broadcast;}else{start_ip=network+1;end_ip=broadcast-1;}}
-let ips=[];for(let ip=start_ip;ip<=end_ip;ip++){ips.push(intToOctets(ip));}
+function getIPs(){let ip=EL('local_ip').value;if(!checkIP(ip)){showPopupError('Wrong IP!');return null;}
+let ip_a=ip.split('.');let sum_ip=(ip_a[0]<<24)|(ip_a[1]<<16)|(ip_a[2]<<8)|ip_a[3];let cidr=Number(hub.cfg.netmask);let mask=~(0xffffffff>>>cidr);let network=0,broadcast=0,start_ip=0,end_ip=0;if(cidr===32){network=sum_ip;broadcast=network;start_ip=network;end_ip=network;}else{network=sum_ip&mask;broadcast=network+(~mask);if(cidr===31){start_ip=network;end_ip=broadcast;}else{start_ip=network+1;end_ip=broadcast-1;}}
+let ips=['192.168.4.1'];for(let ip=start_ip;ip<=end_ip;ip++){ips.push(`${(ip >>> 24) & 0xff}.${(ip >>> 16) & 0xff}.${(ip >>> 8) & 0xff}.${ip & 0xff}`);}
 return ips;}
-let devices={};let devices_t={};let controls={};let focused=null;let touch=0;let pressId=null;let dup_names=[];let gauges={};let canvases={};let pickers={};let joys={};let prompts={};let confirms={};let wid_row_id=null;let wid_row_count=0;let wid_row_size=0;let btn_row_id=null;let btn_row_count=0;let dis_scroll_f=false;function save_devices(){localStorage.setItem('devices',JSON.stringify(devices));}
+let devices={};let devices_t={};let controls={};let focused=null;let touch=0;let pressId=null;let dup_names=[];let gauges={};let canvases={};let pickers={};let joys={};let prompts={};let confirms={};let oninp_buffer={};let files=[];let wid_row_id=null;let wid_row_count=0;let wid_row_size=0;let btn_row_id=null;let btn_row_count=0;let dis_scroll_f=false;const waiter='<div class="waiter"><span style="font-size:50px;color:var(--prim)" class="icon spinning"></span></div>';const Modules={INFO:(1<<0),FSBR:(1<<1),FORMAT:(1<<2),DOWNLOAD:(1<<3),UPLOAD:(1<<4),OTA:(1<<5),OTA_URL:(1<<6),REBOOT:(1<<7),SET:(1<<8),READ:(1<<9),DELETE:(1<<10),RENAME:(1<<11)};function save_devices(){localStorage.setItem('devices',JSON.stringify(devices));}
 function load_devices(){if(localStorage.hasOwnProperty('devices')){devices=JSON.parse(localStorage.getItem('devices'));}}
-function addDevice(id){EL('devices').innerHTML+=`<div class="device offline" id="device#${id}" onclick="device_h('${id}')" title="${id} [${devices[id].prefix}]">
+function readModule(module){return!(devices[focused].modules&module);}
+function addDevice(id){let icon=(!isESP()&&devices[id].icon.length)?`<span class="icon icon_min" id="icon#${id}">${devices[id].icon}</span>`:'';EL('devices').innerHTML+=`<div class="device offline" id="device#${id}" onclick="device_h('${id}')" title="${id} [${devices[id].prefix}]">
 <div class="device_inner">
-<div class="d_icon"><!--NON-ESP--><span class="icon icon_min" id="icon#${id}">${devices[id].icon}</span><!--/NON-ESP--></div>
+<div class="d_icon ${icon ? '' : 'd_icon_empty'}">${icon}</div>
 <div class="d_head">
 <span><span class="d_name" id="name#${id}">${devices[id].name}</span><sup class="conn_dev" id="Serial#${id}">S</sup><sup class="conn_dev" id="BT#${id}">B</sup><sup class="conn_dev" id="WS#${id}">W</sup><sup class="conn_dev" id="MQTT#${id}">M</sup></span>
 </div>
 <div class="d_delete" onclick="delete_h('${id}')">x</div>
 </div>
 </div>`;}
-function addButton(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);if(wid_row_id){endButtons();let inner=renderButton(ctrl.name,'icon btn_icon',ctrl.name,'',ctrl.size*3,ctrl.color,true);addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{if(!btn_row_id)beginButtons();EL(btn_row_id).innerHTML+=`${renderButton(ctrl.name, 'c_btn', ctrl.name, ctrl.clabel, ctrl.size, ctrl.color, false)}`;}}
+function addButton(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);if(wid_row_id){let label=ctrl.wlabel,icon='';if(ctrl.wlabel.charCodeAt(0)>=0xF005){icon=label[0];label=label.slice(1).trim();}
+endButtons();let inner=renderButton(ctrl.name,'icon btn_icon',ctrl.name,icon,ctrl.size*3,ctrl.color,true);addWidget(ctrl.tab_w,ctrl.name,label,inner);}else{if(!btn_row_id)beginButtons();let label=ctrl.clabel,icon='';if(ctrl.clabel.charCodeAt(0)>=0xF005){icon=label[0];label=label.slice(1).trim();label=`<span class="icon icon_min">${icon}</span>&nbsp;`+label;}
+EL(btn_row_id).innerHTML+=`${renderButton(ctrl.name, 'c_btn', ctrl.name, label, ctrl.size, ctrl.color, false)}`;}}
 function addButtonIcon(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);if(wid_row_id){endButtons();let inner=renderButton(ctrl.name,'icon btn_icon',ctrl.name,ctrl.label,ctrl.size,ctrl.color,true);addWidget(ctrl.tab_w,ctrl.name,'',inner,0,true);}else{if(!btn_row_id)beginButtons();EL(btn_row_id).innerHTML+=`${renderButton(ctrl.name, 'icon btn_icon', ctrl.name, ctrl.label, ctrl.size, ctrl.color, true)}`;}}
+function beginButtons(){btn_row_id='buttons_row#'+btn_row_count;btn_row_count++;EL('controls').innerHTML+=`
+<div id="${btn_row_id}" class="control control_nob control_scroll"></div>
+`;}
+function endButtons(){if(btn_row_id&&EL(btn_row_id).getElementsByTagName('*').length==1){EL(btn_row_id).innerHTML="<div></div>"+EL(btn_row_id).innerHTML+"<div></div>";}
+btn_row_id=null;}
+function renderButton(title,className,name,label,size,color=null,is_icon=false){let col=(color!=null)?((is_icon?';color:':';background:')+intToCol(color)):'';return`<button id="#${name}" title='${title}' style="font-size:${size}px${col}" class="${className}" onmousedown="if(!touch)click_h('${name}',1)" onmouseup="if(!touch&&pressId)click_h('${name}',0)" onmouseleave="if(pressId&&!touch)click_h('${name}',0);" ontouchstart="touch=1;click_h('${name}',1)" ontouchend="click_h('${name}',0)">${label}</button>`;}
 function addTabs(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let tabs='';let labels=ctrl.text.toString().split(',');for(let i in labels){let sel=(i==ctrl.value)?'class="tab_act"':'';tabs+=`<li onclick="set_h('${ctrl.name}','${i}')" ${sel}>${labels[i]}</li>`;}
 if(wid_row_id){let inner=`
 <div class="navtab_tab">
@@ -413,68 +536,32 @@ ${tabs}
 </ul>
 </div>
 `;}}
-function addMenu(ctrl){let inner='';let labels=ctrl.text.toString().split(',');for(let i in labels){let sel=(i==ctrl.value)?'menu_act':'';inner+=`<div onclick="menu_click(${i})" class="menu_item ${sel}">${labels[i]}</div>`;}
+function addMenu(ctrl){let inner='';let labels=ctrl.text.toString().split(',');for(let i in labels){let sel=(i==ctrl.value)?'menu_act':'';inner+=`<div onclick="menuClick(${i})" class="menu_item ${sel}">${labels[i]}</div>`;}
 document.querySelector(':root').style.setProperty('--menu_h',((labels.length+2)*35+10)+'px');EL('menu_user').innerHTML=inner;}
-function menu_click(num){menu_show(0);menu_deact();if(screen!='device')show_screen('device');set_h('_menu',num);}
-function menu_deact(){let els=document.getElementById('menu_user').children;for(let el in els){if(els[el].tagName=='DIV')els[el].classList.remove('menu_act');}
+function menuClick(num){menu_show(0);menuDeact();if(screen!='device')show_screen('device');set_h('_menu',num);}
+function menuDeact(){let els=document.getElementById('menu_user').children;for(let el in els){if(els[el].tagName=='DIV')els[el].classList.remove('menu_act');}
 EL('menu_info').classList.remove('menu_act');EL('menu_fsbr').classList.remove('menu_act');}
-function addSpace(ctrl){endButtons();EL('controls').innerHTML+=`
-<div style="height:${ctrl.height}px"></div>
-`;}
-function addTitle(ctrl){endWidgets();endButtons();EL('controls').innerHTML+=`
-<div class="control control_title">
-<span class="c_title">${ctrl.label}</span>
-</div>
-`;}
-function addLED(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let ch=ctrl.value?'checked':'';if(ctrl.text){if(wid_row_id){let inner=`
-<label id="swlabel_${ctrl.name}" class="led_i_cont led_i_cont_tab"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="switch_i led_i led_i_tab">${ctrl.text}</span></label>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="control">
-<label title='${ctrl.name}'>${ctrl.clabel}</label>
-<label id="swlabel_${ctrl.name}" class="led_i_cont"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="switch_i led_i">${ctrl.text}</span></label>
-</div>
-`;}}else{if(wid_row_id){let inner=`
-<label class="led_cont"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="led"></span></label>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="control">
-<label title='${ctrl.name}'>${ctrl.clabel}</label>
-<label class="led_cont"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="led"></span></label>
-</div>
-`;}}}
-function addIcon(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let col=(ctrl.color!=null)?`color:${intToCol(ctrl.color)}`:'';if(wid_row_id){let inner=`
-<span class="icon icon_t" id='#${ctrl.name}' style="${col}">${ctrl.text}</span>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="control">
-<label title='${ctrl.name}'>${ctrl.clabel}</label>
-<span class="icon icon_t" id='#${ctrl.name}' style="${col}">${ctrl.text}</span>
-</div>
-`;}}
-function addLabel(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let col=(ctrl.color)?(`color:${intToCol(ctrl.color)}`):'';if(wid_row_id){let inner=`
-<label class="c_label text_t c_label_tab" id='#${ctrl.name}' style="${col};font-size:${ctrl.size}px">${ctrl.value}</label>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="control">
-<label title='${ctrl.name}'>${ctrl.clabel}</label>
-<label class="c_label text_t" id='#${ctrl.name}' style="${col};font-size:${ctrl.size}px">${ctrl.value}</label>
-</div>
-`;}}
 function addInput(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let col=(ctrl.color!=null)?('box-shadow: 0px 2px 0px 0px '+intToCol(ctrl.color)):'';if(wid_row_id){let inner=`
 <div class="cfg_inp_row cfg_inp_row_tab">
-<input class="cfg_inp c_inp input_t" style="${col}" type="text" value="${ctrl.value}" id="#${ctrl.name}" name="${ctrl.name}" onkeydown="checkEnter(this)" oninput="checkLen(this,${ctrl.max})">
+<input class="cfg_inp c_inp input_t" style="${col}" type="text" value="${ctrl.value}" id="#${ctrl.name}" name="${ctrl.name}" onkeydown="checkEnter(this)" oninput="checkLen(this,${ctrl.max})" pattern="${ctrl.regex}">
 <div class="cfg_btn_block">
-<button class="icon cfg_btn" onclick="set_h('${ctrl.name}',EL('#${ctrl.name}').value)"></button>
+<button class="icon cfg_btn" onclick="sendInput('${ctrl.name}')"></button>
 </div>
 </div>
 `;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
 <div class="control">
 <label title='${ctrl.name}'>${ctrl.clabel}</label>
 <div class="cfg_inp_row">
-<input class="cfg_inp c_inp input_t" style="${col}" type="text" value="${ctrl.value}" id="#${ctrl.name}" name="${ctrl.name}" onkeydown="checkEnter(this)" oninput="checkLen(this,${ctrl.max})">
+<input class="cfg_inp c_inp input_t" style="${col}" type="text" value="${ctrl.value}" id="#${ctrl.name}" name="${ctrl.name}" onkeydown="checkEnter(this)" oninput="checkLen(this,${ctrl.max})" pattern="${ctrl.regex}">
 <div class="cfg_btn_block">
-<button class="icon cfg_btn" onclick="set_h('${ctrl.name}',EL('#${ctrl.name}').value)"></button>
+<button class="icon cfg_btn" onclick="sendInput('${ctrl.name}')"></button>
 </div>
 </div>
 </div>
 `;}}
+function sendInput(name){let inp=EL('#'+name);const r=new RegExp(inp.pattern);if(r.test(inp.value))set_h(name,inp.value);else showPopupError("Wrong text!");}
+function checkLen(arg,len){if(len&&arg.value.length>len)arg.value=arg.value.substring(0,len);}
+function checkEnter(arg){if(event.key=='Enter')set_h(arg.name,arg.value);}
 function addPass(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let col=(ctrl.color!=null)?('box-shadow: 0px 2px 0px 0px '+intToCol(ctrl.color)):'';if(wid_row_id){let inner=`
 <div class="cfg_inp_row cfg_inp_row_tab">
 <input class="cfg_inp c_inp input_t" style="${col}" type="password" value="${ctrl.value}" id="#${ctrl.name}" name="${ctrl.name}" onkeydown="checkEnter(this)" oninput="checkLen(this,${ctrl.max})">
@@ -495,6 +582,7 @@ function addPass(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();l
 </div>
 </div>
 `;}}
+function togglePass(id){if(EL(id).type=='text')EL(id).type='password';else EL(id).type='text';}
 function addSlider(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let col=(ctrl.color!=null)?`background-image: linear-gradient(${intToCol(ctrl.color)}, ${intToCol(ctrl.color)})`:'';let formatted=formatToStep(ctrl.value,ctrl.step);if(wid_row_id){let inner=`
 <input ontouchstart="dis_scroll_f=2" ontouchend="dis_scroll_f=0;enableScroll()" name="${ctrl.name}" id="#${ctrl.name}" oninput="moveSlider(this)" type="range" class="c_rangeW slider_t" style="${col}" value="${ctrl.value}" min="${ctrl.min}" max="${ctrl.max}" step="${ctrl.step}"><div class="sldW_out"><output id="out#${ctrl.name}">${formatted}</output></div>
 `;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
@@ -509,6 +597,9 @@ function addSlider(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons()
 </div>
 </div>
 `;}}
+function moveSliders(){document.querySelectorAll('.c_range, .c_rangeW').forEach(x=>{moveSlider(x,false)});}
+function moveSlider(arg,sendf=true){if(dis_scroll_f){dis_scroll_f--;if(!dis_scroll_f)disableScroll();}
+arg.style.backgroundSize=(arg.value-arg.min)*100/(arg.max-arg.min)+'% 100%';EL('out'+arg.id).value=formatToStep(arg.value,arg.step);if(sendf)input_h(arg.name,arg.value);}
 function addSwitch(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let ch=ctrl.value?'checked':'';let col=(ctrl.color!=null)?`<style>#swlabel_${ctrl.name} input:checked+.slider{background:${intToCol(ctrl.color)}}</style>`:'';if(wid_row_id){let inner=`${col}
 <label id="swlabel_${ctrl.name}" class="switch"><input type="checkbox" class="switch_t" id='#${ctrl.name}' onclick="set_h('${ctrl.name}',(this.checked ? 1 : 0))" ${ch}><span class="slider"></span></label>
 `;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`${col}
@@ -517,7 +608,7 @@ function addSwitch(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons()
 <label id="swlabel_${ctrl.name}" class="switch"><input type="checkbox" class="switch_t" id='#${ctrl.name}' onclick="set_h('${ctrl.name}',(this.checked ? 1 : 0))" ${ch}><span class="slider"></span></label>
 </div>
 `;}}
-function addSwitchIcon(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let ch=ctrl.value?'checked':'';let text=ctrl.text?ctrl.text:'';if(wid_row_id){let col=(ctrl.color!=null)?`<style>#swlabel_${ctrl.name} input:checked+.switch_i_tab{background:${intToCol(ctrl.color)};color:var(--font_inv)} #swlabel_${ctrl.name} .switch_i_tab{box-shadow: 0 0 0 2px ${intToCol(ctrl.color)};color:${intToCol(ctrl.color)}}</style>`:'';let inner=`${col}
+function addSwitchIcon(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let ch=ctrl.value?'checked':'';let text=ctrl.text?ctrl.text:'';if(isESP())text="";if(wid_row_id){let col=(ctrl.color!=null)?`<style>#swlabel_${ctrl.name} input:checked+.switch_i_tab{background:${intToCol(ctrl.color)};color:var(--font_inv)} #swlabel_${ctrl.name} .switch_i_tab{box-shadow: 0 0 0 2px ${intToCol(ctrl.color)};color:${intToCol(ctrl.color)}}</style>`:'';let inner=`${col}
 <label id="swlabel_${ctrl.name}" class="switch_i_cont switch_i_cont_tab"><input type="checkbox" onclick="set_h('${ctrl.name}',(this.checked ? 1 : 0))" class="switch_t" id='#${ctrl.name}' ${ch}><span class="switch_i switch_i_tab">${text}</span></label>
 `;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner,120);}else{let col=(ctrl.color!=null)?`<style>#swlabel_${ctrl.name} input:checked+.switch_i{color:${intToCol(ctrl.color)}}</style>`:'';EL('controls').innerHTML+=`${col}
 <div class="control">
@@ -557,19 +648,7 @@ function addDateTime(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons
 <input id='#${ctrl.name}' class="cfg_inp c_inp_block datime datime_w datetime_t" style="${col}" type="datetime-local" value="${datetime}" onclick="this.showPicker()" onchange="set_h('${ctrl.name}',getUnix(this))" step="1">
 </div>
 `;}}
-function addSelect(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let elms=ctrl.text.toString().split(',');let options='';for(let i in elms){let sel=(i==ctrl.value)?'selected':'';options+=`<option value="${i}" ${sel}>${elms[i]}</option>`;}
-let col=(ctrl.color!=null)?`color:${intToCol(ctrl.color)}`:'';if(wid_row_id){let inner=`
-<select class="cfg_inp c_inp_block select_t" style="${col}" id='#${ctrl.name}' onchange="set_h('${ctrl.name}',this.value)">
-${options}
-</select>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="control">
-<label title='${ctrl.name}'>${ctrl.clabel}</label>
-<select class="cfg_inp c_inp_block select_t" style="${col}" id='#${ctrl.name}' onchange="set_h('${ctrl.name}',this.value)">
-${options}
-</select>
-</div>
-`;}}
+function getUnix(arg){return Math.floor(arg.valueAsNumber/1000);}
 function addColor(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let color=intToCol(ctrl.value);let inner=`
 <div id="color_cont#${ctrl.name}" style="visibility: hidden">
 <div id='#${ctrl.name}'></div>
@@ -582,6 +661,8 @@ ${inner}
 </div>
 `;}
 pickers[ctrl.name]=color;}
+function openPicker(id){EL('color_cont#'+id).getElementsByTagName('button')[0].click()}
+function showPickers(){for(let picker in pickers){let id='#'+picker;let obj=Pickr.create({el:EL(id),theme:'nano',default:pickers[picker],defaultRepresentation:'HEXA',components:{preview:true,hue:true,interaction:{hex:false,input:true,save:true}}}).on('save',(color)=>{let col=color.toHEXA().toString();set_h(picker,colToInt(col));EL('color_btn'+id).style.color=col;});pickers[picker]=obj;}}
 function addSpinner(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let formatted=formatToStep(ctrl.value,ctrl.step);if(wid_row_id){let inner=`
 <div class="spinner_row">
 <button class="icon cfg_btn btn_no_pad" onclick="spinSpinner(this, -1);set_h('${ctrl.name}',EL('#${ctrl.name}').value);"></button>
@@ -600,8 +681,11 @@ max="${ctrl.max}" step="${ctrl.step}">
 </div>
 </div>
 `;}}
+function spinSpinner(el,dir){let num=(dir==1)?el.previousElementSibling:el.nextElementSibling;let val=Number(num.value)+Number(num.step)*Number(dir);val=Math.max(Number(num.min),val);val=Math.min(Number(num.max),val);num.value=formatToStep(val,num.step);resizeSpinner(num);}
+function resizeSpinner(el){el.style.width=el.value.length+'ch';}
+function resizeSpinners(){let spinners=document.querySelectorAll(".spinner");spinners.forEach((sp)=>resizeSpinner(sp));}
 function addFlags(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let flags="";let val=ctrl.value;let labels=ctrl.text.toString().split(',');for(let i=0;i<labels.length;i++){let ch=(!(val&1))?'':'checked';val>>=1;flags+=`<label id="swlabel_${ctrl.name}" class="chbutton chtext">
-<input name="${ctrl.name}" type="checkbox" onclick="set_h('${ctrl.name}',chbuttonEncode('${ctrl.name}'))" ${ch}>
+<input name="${ctrl.name}" type="checkbox" onclick="set_h('${ctrl.name}',encodeFlags('${ctrl.name}'))" ${ch}>
 <span class="chbutton_s chtext_s">${labels[i]}</span></label>`;}
 let col=(ctrl.color!=null)?`<style>#swlabel_${ctrl.name} input:checked+.chbutton_s{background:${intToCol(ctrl.color)}}</style>`:'';if(wid_row_id){let inner=`${col}
 <div class="chbutton_cont chbutton_cont_tab flags_t" id='#${ctrl.name}'>
@@ -613,6 +697,100 @@ ${flags}
 <div class="chbutton_cont flags_t" id='#${ctrl.name}'>
 ${flags}
 </div>
+</div>
+`;}}
+function resizeFlags(){let chtext=document.querySelectorAll(".chtext");let chtext_s=document.querySelectorAll(".chtext_s");chtext.forEach((ch,i)=>{let len=chtext_s[i].innerHTML.length+2;chtext[i].style.width=(len+0.5)+'ch';chtext_s[i].style.width=len+'ch';});}
+function encodeFlags(name){let weeks=document.getElementsByName(name);let encoded=0;weeks.forEach((w,i)=>{if(w.checked)encoded|=(1<<weeks.length);encoded>>=1;});return encoded;}
+function addCanvas(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();if(wid_row_id){let inner=`
+<canvas onclick="clickCanvas('${ctrl.name}',event)" class="${ctrl.active ? 'canvas_act' : ''} canvas_t" id="#${ctrl.name}"></canvas>
+`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="cv_block">
+<canvas onclick="clickCanvas('${ctrl.name}',event)" class="${ctrl.active ? 'canvas_act' : ''} canvas_t" id="#${ctrl.name}"></canvas>
+</div>
+`;}
+canvases[ctrl.name]={name:ctrl.name,width:ctrl.width,height:ctrl.height,value:ctrl.value};}
+function showCanvases(){Object.values(canvases).forEach(canvas=>{let cv=EL('#'+canvas.name);if(!cv||!cv.parentNode.clientWidth)return;let rw=cv.parentNode.clientWidth;canvas.scale=rw/canvas.width;let rh=Math.floor(canvas.height*canvas.scale);cv.style.width=rw+'px';cv.style.height=rh+'px';cv.width=Math.floor(rw*ratio());cv.height=Math.floor(rh*ratio());canvas.scale*=ratio();drawCanvas(canvas);});}
+function drawCanvas(canvas){let ev_str='';let cv=EL('#'+canvas.name);function cv_map(v,h){v*=canvas.scale;return v>=0?v:(h?cv.height:cv.width)-v;}
+function scale(){return canvas.scale;}
+let cx=cv.getContext("2d");const cmd_list=['fillStyle','strokeStyle','shadowColor','shadowBlur','shadowOffsetX','shadowOffsetY','lineWidth','miterLimit','font','textAlign','textBaseline','lineCap','lineJoin','globalCompositeOperation','globalAlpha','scale','rotate','rect','fillRect','strokeRect','clearRect','moveTo','lineTo','quadraticCurveTo','bezierCurveTo','translate','arcTo','arc','fillText','strokeText','drawImage','roundRect','fill','stroke','beginPath','closePath','clip','save','restore'];const const_list=['butt','round','square','square','bevel','miter','start','end','center','left','right','alphabetic','top','hanging','middle','ideographic','bottom','source-over','source-atop','source-in','source-out','destination-over','destination-atop','destination-in','destination-out','lighter','copy','xor','top','bottom','middle','alphabetic'];for(d of canvas.value){let div=d.indexOf(':');let cmd=parseInt(d,10);if(!isNaN(cmd)&&cmd<=37){if(div==1||div==2){let val=d.slice(div+1);let vals=val.split(',');if(cmd<=2)ev_str+=('cx.'+cmd_list[cmd]+'=\''+intToColA(val)+'\';');else if(cmd<=7)ev_str+=('cx.'+cmd_list[cmd]+'='+(val*scale())+';');else if(cmd<=13)ev_str+=('cx.'+cmd_list[cmd]+'=\''+const_list[val]+'\';');else if(cmd<=14)ev_str+=('cx.'+cmd_list[cmd]+'='+val+';');else if(cmd<=16)ev_str+=('cx.'+cmd_list[cmd]+'('+val+');');else if(cmd<=26){let str='cx.'+cmd_list[cmd]+'(';for(let i in vals){if(i>0)str+=',';str+=`cv_map(${vals[i]},${(i % 2)})`;}
+ev_str+=(str+');');}else if(cmd==27){ev_str+=(`cx.${cmd_list[cmd]}(cv_map(${vals[0]},0),cv_map(${vals[1]},1),cv_map(${vals[2]},0),${vals[3]},${vals[4]},${vals[5]});`);}else if(cmd<=29){ev_str+=(`cx.${cmd_list[cmd]}(${vals[0]},cv_map(${vals[1]},0),cv_map(${vals[2]},1),${vals[3]});`);}else if(cmd==30){let str='cx.'+cmd_list[cmd]+'(';for(let i in vals){if(i>0){str+=`,cv_map(${vals[i]},${!(i % 2)})`;}else str+=vals[i];}
+ev_str+=(str+');');}else if(cmd==31){let str='cx.'+cmd_list[cmd]+'(';for(let i=0;i<4;i++){if(i>0)str+=',';str+=`cv_map(${vals[i]},${(i % 2)})`;}
+if(vals.length==5)str+=`,${vals[4] * scale()}`;else{str+=',[';for(let i=4;i<vals.length;i++){if(i>4)str+=',';str+=`cv_map(${vals[i]},${(i % 2)})`;}
+str+=']';}
+ev_str+=(str+');');}}else{if(cmd>=32)ev_str+=('cx.'+cmd_list[cmd]+'();');}}else{ev_str+=d+';';}}
+eval(ev_str);canvas.value=null;}
+function clickCanvas(id,e){if(!(id in canvases))return;let rect=EL('#'+id).getBoundingClientRect();let scale=canvases[id].scale;let x=Math.round((e.clientX-rect.left)/scale*ratio());if(x<0)x=0;let y=Math.round((e.clientY-rect.top)/scale*ratio());if(y<0)y=0;set_h(id,(x<<16)|y);}
+function addGauge(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();if(wid_row_id){let inner=`
+<canvas class="gauge_t" id="#${ctrl.name}"></canvas>
+`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="cv_block cv_block_back">
+<canvas class="gauge_t" id="#${ctrl.name}"></canvas>
+</div>
+`;}
+gauges[ctrl.name]={perc:null,name:ctrl.name,value:Number(ctrl.value),min:Number(ctrl.min),max:Number(ctrl.max),step:Number(ctrl.step),text:ctrl.text,color:ctrl.color};}
+function drawGauge(g){let cv=EL('#'+g.name);if(!cv||!cv.parentNode.clientWidth)return;let perc=(g.value-g.min)*100/(g.max-g.min);if(perc<0)perc=0;if(perc>100)perc=100;if(g.perc==null)g.perc=perc;else{if(Math.abs(g.perc-perc)<=0.2)g.perc=perc;else g.perc+=(perc-g.perc)*0.2;if(g.perc!=perc)setTimeout(()=>drawGauge(g),30);}
+let cx=cv.getContext("2d");let v=themes[cfg.theme];let col=g.color==null?intToCol(colors[cfg.maincolor]):intToCol(g.color);let rw=cv.parentNode.clientWidth;let rh=Math.floor(rw*0.47);cv.style.width=rw+'px';cv.style.height=rh+'px';cv.width=Math.floor(rw*ratio());cv.height=Math.floor(rh*ratio());cx.clearRect(0,0,cv.width,cv.height);cx.lineWidth=cv.width/8;cx.strokeStyle=theme_cols[v][4];cx.beginPath();cx.arc(cv.width/2,cv.height*0.97,cv.width/2-cx.lineWidth,Math.PI*(1+g.perc/100),Math.PI*2);cx.stroke();cx.strokeStyle=col;cx.beginPath();cx.arc(cv.width/2,cv.height*0.97,cv.width/2-cx.lineWidth,Math.PI,Math.PI*(1+g.perc/100));cx.stroke();let font=cfg.font;font='PTSans Narrow';cx.fillStyle=col;cx.font='10px '+font;cx.textAlign="center";let text=g.text;let len=Math.max((formatToStep(g.value,g.step)+text).length,(formatToStep(g.min,g.step)+text).length,(formatToStep(g.max,g.step)+text).length);if(len==1)text+='  ';else if(len==2)text+=' ';let w=Math.max(cx.measureText(formatToStep(g.value,g.step)+text).width,cx.measureText(formatToStep(g.min,g.step)+text).width,cx.measureText(formatToStep(g.max,g.step)+text).width);cx.fillStyle=theme_cols[v][3];cx.font=cv.width*0.45*10/w+'px '+font;cx.fillText(formatToStep(g.value,g.step)+g.text,cv.width/2,cv.height*0.93);cx.font='10px '+font;w=Math.max(cx.measureText(Math.round(g.min)).width,cx.measureText(Math.round(g.max)).width);cx.fillStyle=theme_cols[v][2];cx.font=cx.lineWidth*0.55*10/w+'px '+font;cx.fillText(g.min,cx.lineWidth,cv.height*0.92);cx.fillText(g.max,cv.width-cx.lineWidth,cv.height*0.92);}
+function showGauges(){Object.values(gauges).forEach(gauge=>{drawGauge(gauge);});}
+function addJoy(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let inner=`
+<div id="joy#${ctrl.name}" class="joyCont"><canvas id="#${ctrl.name}"></canvas></div>
+`;if(wid_row_id){addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div id="joy#${ctrl.name}" class="joyCont"><canvas id="#${ctrl.name}"></canvas></div>
+`;}
+joys[ctrl.name]=ctrl;}
+function showJoys(){for(let joy in joys){joys[joy].joy=new Joystick(joy,intToCol(joys[joy].color==null?colors[cfg.maincolor]:joys[joy].color),joys[joy].auto,joys[joy].exp,function(data){input_h(joy,((data.x+255)<<16)|(data.y+255));});}}
+function addSpace(ctrl){if(wid_row_id){checkWidget(ctrl);wid_row_size+=ctrl.tab_w;if(wid_row_size>100){beginWidgets();wid_row_size=ctrl.tab_w;}
+EL(wid_row_id).innerHTML+=`
+<div class="widget" style="width:${ctrl.tab_w}%"><div class="widget_inner widget_space"></div></div>
+`;}else{endButtons();EL('controls').innerHTML+=`
+<div style="height:${ctrl.height}px"></div>
+`;}}
+function addTitle(ctrl){endWidgets();endButtons();EL('controls').innerHTML+=`
+<div class="control control_title">
+<span class="c_title">${ctrl.label}</span>
+</div>
+`;}
+function addLED(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let ch=ctrl.value?'checked':'';if(ctrl.text){if(wid_row_id){let inner=`
+<label id="swlabel_${ctrl.name}" class="led_i_cont led_i_cont_tab"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="switch_i led_i led_i_tab">${ctrl.text}</span></label>
+`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="control">
+<label title='${ctrl.name}'>${ctrl.clabel}</label>
+<label id="swlabel_${ctrl.name}" class="led_i_cont"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="switch_i led_i">${ctrl.text}</span></label>
+</div>
+`;}}else{if(wid_row_id){let inner=`
+<label class="led_cont"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="led"></span></label>
+`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="control">
+<label title='${ctrl.name}'>${ctrl.clabel}</label>
+<label class="led_cont"><input type="checkbox" class="switch_t" id='#${ctrl.name}' ${ch} disabled><span class="led"></span></label>
+</div>
+`;}}}
+function addIcon(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let col=(ctrl.color!=null)?`color:${intToCol(ctrl.color)}`:'';if(wid_row_id){let inner=`
+<span class="icon icon_t" id='#${ctrl.name}' style="${col}">${ctrl.text}</span>
+`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="control">
+<label title='${ctrl.name}'>${ctrl.clabel}</label>
+<span class="icon icon_t" id='#${ctrl.name}' style="${col}">${ctrl.text}</span>
+</div>
+`;}}
+function addLabel(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let col=(ctrl.color)?(`color:${intToCol(ctrl.color)}`):'';if(wid_row_id){let inner=`
+<label class="c_label text_t c_label_tab" id='#${ctrl.name}' style="${col};font-size:${ctrl.size}px">${ctrl.value}</label>
+`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="control">
+<label title='${ctrl.name}'>${ctrl.clabel}</label>
+<label class="c_label text_t" id='#${ctrl.name}' style="${col};font-size:${ctrl.size}px">${ctrl.value}</label>
+</div>
+`;}}
+function addSelect(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let elms=ctrl.text.toString().split(',');let options='';for(let i in elms){let sel=(i==ctrl.value)?'selected':'';options+=`<option value="${i}" ${sel}>${elms[i]}</option>`;}
+let col=(ctrl.color!=null)?`color:${intToCol(ctrl.color)}`:'';if(wid_row_id){let inner=`
+<select class="cfg_inp c_inp_block select_t" style="${col}" id='#${ctrl.name}' onchange="set_h('${ctrl.name}',this.value)">
+${options}
+</select>
+`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="control">
+<label title='${ctrl.name}'>${ctrl.clabel}</label>
+<select class="cfg_inp c_inp_block select_t" style="${col}" id='#${ctrl.name}' onchange="set_h('${ctrl.name}',this.value)">
+${options}
+</select>
 </div>
 `;}}
 function addLog(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();if(ctrl.text.endsWith('\n'))ctrl.text=ctrl.text.slice(0,-1);if(wid_row_id){let inner=`
@@ -629,54 +807,38 @@ function addDisplay(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons(
 <textarea id="#${ctrl.name}" title='${ctrl.name}' class="cfg_inp c_area c_disp text_t" style="font-size:${ctrl.size}px;${col}" rows="${ctrl.rows}" readonly>${ctrl.value}</textarea>
 </div>
 `;}}
-function addHTML(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();if(wid_row_id){let inner=`
-<div name="text" id="#${ctrl.name}" title='${ctrl.name}' class="c_text text_t">${ctrl.value}</div>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+function addHTML(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let inner=`<div name="text" id="#${ctrl.name}" title='${ctrl.name}' class="c_text text_t">${ctrl.value}</div>`;if(wid_row_id){addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
 <div class="control control_nob">
-<div name="text" id="#${ctrl.name}" title='${ctrl.name}' class="c_text text_t">${ctrl.value}</div>
+${inner}
 </div>
 `;}}
-function addCanvas(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();if(wid_row_id){let inner=`
-<canvas onclick="clickCanvas('${ctrl.name}',event)" class="${ctrl.active ? 'canvas_act' : ''} canvas_t" id="#${ctrl.name}"></canvas>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="cv_block">
-<canvas onclick="clickCanvas('${ctrl.name}',event)" class="${ctrl.active ? 'canvas_act' : ''} canvas_t" id="#${ctrl.name}"></canvas>
-</div>
-`;}
-canvases[ctrl.name]={name:ctrl.name,width:ctrl.width,height:ctrl.height,value:ctrl.value};}
-function addGauge(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();if(wid_row_id){let inner=`
-<canvas class="gauge_t" id="#${ctrl.name}"></canvas>
-`;addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="cv_block cv_block_back">
-<canvas class="gauge_t" id="#${ctrl.name}"></canvas>
-</div>
-`;}
-gauges[ctrl.name]={perc:null,name:ctrl.name,value:Number(ctrl.value),min:Number(ctrl.min),max:Number(ctrl.max),step:Number(ctrl.step),text:ctrl.text,color:ctrl.color};}
-function addImage(ctrl){checkWidget(ctrl);endButtons();if(wid_row_id){let inner=`
-<img src="${ctrl.value}" style="width: 100%">
-`;addWidget(ctrl.tab_w,'',ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="cv_block cv_block_back">
-<img src="${ctrl.value}" style="width: 100%">
-</div>
-`;}}
-function addStream(ctrl){checkWidget(ctrl);endButtons();if(wid_row_id){let inner=`
-`;addWidget(ctrl.tab_w,'',ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div class="cv_block cv_block_back">
-</div>
-`;}}
-function addJoy(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let inner=`
-<div id="joy#${ctrl.name}" class="joyCont"><canvas id="#${ctrl.name}"></canvas></div>
+function addImage(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let inner=`
+<div class="image_t" name="${ctrl.value}" id="#${ctrl.name}">${waiter}</div>
 `;if(wid_row_id){addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
-<div id="joy#${ctrl.name}" class="joyCont"><canvas id="#${ctrl.name}"></canvas></div>
+<div class="cv_block cv_block_back">
+${inner}
+</div>
 `;}
-joys[ctrl.name]=ctrl;}
+files.push({id:'#'+ctrl.name,path:ctrl.value,type:'img'});}
+function addStream(ctrl,conn,ip){checkWidget(ctrl);endButtons();let inner='<label>No connection</label>';if(conn==Conn.WS&&ip!='unset')inner=`<img style="width:100%" src="http://${ip}:${ctrl.port}/">`;if(wid_row_id){addWidget(ctrl.tab_w,'',ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="cv_block cv_block_back">
+${inner}
+</div>
+`;}}
+function addTable(ctrl){if(checkDup(ctrl))return;checkWidget(ctrl);endButtons();let table=parseCSV(ctrl.value);let aligns=ctrl.align.split(',');let widths=ctrl.width.split(',');let inner='<table class="c_table">';for(let row of table){inner+='<tr>';for(let col in row){inner+=`<td width="${widths[col] ? (widths[col] + '%') : ''}" align="${aligns[col] ? aligns[col] : 'center'}">${row[col]}</td>`;}
+inner+='</tr>';}
+inner+='</table>';if(wid_row_id){addWidget(ctrl.tab_w,ctrl.name,ctrl.wlabel,inner);}else{EL('controls').innerHTML+=`
+<div class="control control_nob">
+${inner}
+</div>
+`;}}
 function checkWidget(ctrl){if(ctrl.tab_w&&!wid_row_id)beginWidgets(null,true);}
 function beginWidgets(ctrl=null,check=false){if(!check)endButtons();wid_row_size=0;if(devices[focused].break_widgets)return;let st=(ctrl&&ctrl.height)?`style="height:${ctrl.height}px"`:'';wid_row_id='widgets_row#'+wid_row_count;wid_row_count++;EL('controls').innerHTML+=`
 <div class="widget_row" id="${wid_row_id}" ${st}></div>
 `;}
 function endWidgets(){endButtons();wid_row_id=null;}
 function addWidget(width,name,label,inner,height=0,noback=false){wid_row_size+=width;if(wid_row_size>100){beginWidgets();wid_row_size=width;}
-let h=height?('height:'+height+'px'):'';let lbl=(label&&label!='_no')?`<div class="widget_label" title="${name}">${label}</div>`:'';EL(wid_row_id).innerHTML+=`
+let h=height?('height:'+height+'px'):'';let lbl=(label&&label!='_no')?`<div class="widget_label" title="${name}">${label}<span id="wlabel#${name}"></span></div>`:'';EL(wid_row_id).innerHTML+=`
 <div class="widget" style="width:${width}%;${h}">
 <div class="widget_inner ${noback ? 'widget_space' : ''}">
 ${lbl}
@@ -686,47 +848,30 @@ ${inner}
 </div>
 </div>
 `;}
-function openPicker(id){EL('color_cont#'+id).getElementsByTagName('button')[0].click()}
-function showPickers(){for(let picker in pickers){let id='#'+picker;Pickr.create({el:EL(id),theme:'nano',default:pickers[picker],defaultRepresentation:'HEXA',components:{preview:true,hue:true,interaction:{hex:false,input:true,save:true}}}).on('save',(color)=>{let col=color.toHEXA().toString();set_h(picker,colToInt(col));EL('color_btn'+id).style.color=col;});}}
-function renderButton(title,className,name,label,size,color=null,is_icon=false){let col=(color!=null)?((is_icon?';color:':';background:')+intToCol(color)):'';return`<button id="#${name}" title='${title}' style="font-size:${size}px${col}" class="${className}" onmousedown="if(!touch)click_h('${name}',1)" onmouseup="if(!touch&&pressId)click_h('${name}',0)" onmouseleave="if(pressId&&!touch)click_h('${name}',0);" ontouchstart="touch=1;click_h('${name}',1)" ontouchend="click_h('${name}',0)">${label}</button>`;}
-function beginButtons(){btn_row_id='buttons_row#'+btn_row_count;btn_row_count++;EL('controls').innerHTML+=`
-<div id="${btn_row_id}" class="control control_nob control_scroll"></div>
-`;}
-function endButtons(){if(btn_row_id&&EL(btn_row_id).getElementsByTagName('*').length==1){EL(btn_row_id).innerHTML="<div></div>"+EL(btn_row_id).innerHTML+"<div></div>";}
-btn_row_id=null;}
-function spinSpinner(el,dir){let num=(dir==1)?el.previousElementSibling:el.nextElementSibling;let val=Number(num.value)+Number(num.step)*Number(dir);val=Math.max(Number(num.min),val);val=Math.min(Number(num.max),val);num.value=formatToStep(val,num.step);resizeSpinner(num);}
-function resizeSpinner(el){el.style.width=el.value.length+'ch';}
-function resizeSpinners(){let spinners=document.querySelectorAll(".spinner");spinners.forEach((sp)=>resizeSpinner(sp));}
-function moveSliders(){document.querySelectorAll('.c_range, .c_rangeW').forEach(x=>{moveSlider(x,false)});}
-function moveSlider(arg,sendf=true){if(dis_scroll_f){dis_scroll_f--;if(!dis_scroll_f)disableScroll();}
-arg.style.backgroundSize=(arg.value-arg.min)*100/(arg.max-arg.min)+'% 100%';EL('out'+arg.id).value=formatToStep(arg.value,arg.step);if(sendf)input_h(arg.name,arg.value);}
-function showCanvases(){Object.values(canvases).forEach(canvas=>{let cv=EL('#'+canvas.name);if(!cv||!cv.parentNode.clientWidth)return;let rw=cv.parentNode.clientWidth;canvas.scale=rw/canvas.width;let rh=Math.floor(canvas.height*canvas.scale);cv.style.width=rw+'px';cv.style.height=rh+'px';cv.width=Math.floor(rw*ratio());cv.height=Math.floor(rh*ratio());canvas.scale*=ratio();drawCanvas(canvas);});}
-function drawCanvas(canvas){let ev_str='';let cv=EL('#'+canvas.name);function cv_map(v,h){v*=canvas.scale;return v>=0?v:(h?cv.height:cv.width)-v;}
-function scale(){return canvas.scale;}
-let cx=cv.getContext("2d");const cmd_list=['fillStyle','strokeStyle','shadowColor','shadowBlur','shadowOffsetX','shadowOffsetY','lineWidth','miterLimit','font','textAlign','textBaseline','lineCap','lineJoin','globalCompositeOperation','globalAlpha','scale','rotate','rect','fillRect','strokeRect','clearRect','moveTo','lineTo','quadraticCurveTo','bezierCurveTo','translate','arcTo','arc','fillText','strokeText','drawImage','fill','stroke','beginPath','closePath','clip','save','restore'];const const_list=['butt','round','square','square','bevel','miter','start','end','center','left','right','alphabetic','top','hanging','middle','ideographic','bottom','source-over','source-atop','source-in','source-out','destination-over','destination-atop','destination-in','destination-out','lighter','copy','xor','top','bottom','middle','alphabetic'];for(d of canvas.value){let div=d.indexOf(':');let cmd=parseInt(d,10);if(!isNaN(cmd)&&cmd<=37){if(div==1||div==2){let val=d.slice(div+1);let vals=val.split(',');if(cmd<=2)ev_str+=('cx.'+cmd_list[cmd]+'=\''+intToColA(val)+'\';');else if(cmd<=7)ev_str+=('cx.'+cmd_list[cmd]+'='+(val*canvas.scale)+';');else if(cmd<=13)ev_str+=('cx.'+cmd_list[cmd]+'=\''+const_list[val]+'\';');else if(cmd<=14)ev_str+=('cx.'+cmd_list[cmd]+'='+val+';');else if(cmd<=16)ev_str+=('cx.'+cmd_list[cmd]+'('+val+');');else if(cmd<=26){let str='cx.'+cmd_list[cmd]+'(';for(let i in vals){if(i>0)str+=',';str+=`cv_map(${vals[i]},${(i % 2)})`;}
-ev_str+=(str+');');}else if(cmd==27){ev_str+=(`cx.${cmd_list[cmd]}(cv_map(${vals[0]},0),cv_map(${vals[1]},1),cv_map(${vals[2]},0),${vals[3]},${vals[4]},${vals[5]});`);}else if(cmd<=29){ev_str+=(`cx.${cmd_list[cmd]}(${vals[0]},cv_map(${vals[1]},0),cv_map(${vals[2]},1),${vals[3]});`);}else if(cmd==30){let str='cx.'+cmd_list[cmd]+'(';for(let i in vals){if(i>0){str+=`,cv_map(${vals[i]},${!(i % 2)})`;}else str+=vals[i];}
-ev_str+=(str+');');}}else{if(cmd>=31)ev_str+=('cx.'+cmd_list[cmd]+'();');}}else{ev_str+=d+';';}}
-eval(ev_str);canvas.value=null;}
-function clickCanvas(id,e){if(!(id in canvases))return;let rect=EL('#'+id).getBoundingClientRect();let scale=canvases[id].scale;let x=Math.round((e.clientX-rect.left)/scale*ratio());if(x<0)x=0;let y=Math.round((e.clientY-rect.top)/scale*ratio());if(y<0)y=0;set_h(id,(x<<16)|y);}
-function drawGauge(g){let cv=EL('#'+g.name);if(!cv||!cv.parentNode.clientWidth)return;let perc=(g.value-g.min)*100/(g.max-g.min);if(perc<0)perc=0;if(perc>100)perc=100;if(g.perc==null)g.perc=perc;else{if(Math.abs(g.perc-perc)<=0.2)g.perc=perc;else g.perc+=(perc-g.perc)*0.2;if(g.perc!=perc)setTimeout(()=>drawGauge(g),30);}
-let cx=cv.getContext("2d");let v=themes[cfg.theme];let col=g.color==null?intToCol(colors[cfg.maincolor]):intToCol(g.color);let rw=cv.parentNode.clientWidth;let rh=Math.floor(rw*0.47);cv.style.width=rw+'px';cv.style.height=rh+'px';cv.width=Math.floor(rw*ratio());cv.height=Math.floor(rh*ratio());cx.clearRect(0,0,cv.width,cv.height);cx.lineWidth=cv.width/8;cx.strokeStyle=theme_cols[v][4];cx.beginPath();cx.arc(cv.width/2,cv.height*0.97,cv.width/2-cx.lineWidth,Math.PI*(1+g.perc/100),Math.PI*2);cx.stroke();cx.strokeStyle=col;cx.beginPath();cx.arc(cv.width/2,cv.height*0.97,cv.width/2-cx.lineWidth,Math.PI,Math.PI*(1+g.perc/100));cx.stroke();let font=cfg.font;font='PTSans Narrow';cx.fillStyle=col;cx.font='10px '+font;cx.textAlign="center";let text=g.text;let len=Math.max((formatToStep(g.value,g.step)+text).length,(formatToStep(g.min,g.step)+text).length,(formatToStep(g.max,g.step)+text).length);if(len==1)text+='  ';else if(len==2)text+=' ';let w=Math.max(cx.measureText(formatToStep(g.value,g.step)+text).width,cx.measureText(formatToStep(g.min,g.step)+text).width,cx.measureText(formatToStep(g.max,g.step)+text).width);cx.fillStyle=theme_cols[v][3];cx.font=cv.width*0.45*10/w+'px '+font;cx.fillText(formatToStep(g.value,g.step)+g.text,cv.width/2,cv.height*0.93);cx.font='10px '+font;w=Math.max(cx.measureText(Math.round(g.min)).width,cx.measureText(Math.round(g.max)).width);cx.fillStyle=theme_cols[v][2];cx.font=cx.lineWidth*0.55*10/w+'px '+font;cx.fillText(g.min,cx.lineWidth,cv.height*0.92);cx.fillText(g.max,cv.width-cx.lineWidth,cv.height*0.92);}
-function showGauges(){Object.values(gauges).forEach(gauge=>{drawGauge(gauge);});}
-function checkLen(arg,len){if(len&&arg.value.length>len)arg.value=arg.value.substring(0,len);}
-function checkEnter(arg){if(event.key=='Enter')set_h(arg.name,arg.value);}
-function getUnix(arg){return Math.floor(arg.valueAsNumber/1000);}
 function showNotif(text,name){if(!("Notification"in window)||Notification.permission!='granted')return;let descr=name+' ('+new Date(Date.now()).toLocaleString()+')';navigator.serviceWorker.getRegistration().then(function(reg){reg.showNotification(text,{body:descr,vibrate:true});});}
 function checkDup(ctrl){if(EL('#'+ctrl.name)){dup_names.push(' '+ctrl.name);return 1;}
 return 0;}
-function formatToStep(val,step){step=step.toString();if(step.indexOf('.')>0)return Number(val).toFixed((step.split('.')[1]).toString().length);else return val;}
-function togglePass(id){if(EL(id).type=='text')EL(id).type='password';else EL(id).type='text';}
-function resizeChbuttons(){let chtext=document.querySelectorAll(".chtext");let chtext_s=document.querySelectorAll(".chtext_s");chtext.forEach((ch,i)=>{let len=chtext_s[i].innerHTML.length+2;chtext[i].style.width=(len+0.5)+'ch';chtext_s[i].style.width=len+'ch';});}
-function chbuttonEncode(name){let weeks=document.getElementsByName(name);let encoded=0;weeks.forEach((w,i)=>{if(w.checked)encoded|=(1<<weeks.length);encoded>>=1;});return encoded;}
+function formatToStep(val,step){step=step.toString();if(step.includes('.'))return Number(val).toFixed((step.split('.')[1]).toString().length);else return val;}
 function scrollDown(){let logs=document.querySelectorAll(".c_log");logs.forEach((log)=>log.scrollTop=log.scrollHeight);}
-function showJoys(){for(let joy in joys){joys[joy].joy=new Joystick(joy,intToCol(joys[joy].color==null?colors[cfg.maincolor]:joys[joy].color),joys[joy].auto,joys[joy].exp,function(data){input_h(joy,((data.x+255)<<16)|(data.y+255));});}}
-const http_port=80;const ws_port=81;const tout_prd=2800;const ping_prd=3000;const oninput_prd=100;const ws_tout=4000;let discovering=false;let mq_client;let mq_discover_flag=false;let mq_pref_list=[];let ws_focus_flag=false;let tout_interval=null;let ping_interval=null;let oninput_tout=null;let refresh_ui=false;let oninp_buffer={};const Conn={SERIAL:0,BT:1,WS:2,MQTT:3,NONE:4,ERROR:5,};const ConnNames=['Serial','BT','WS','MQTT','None','Error'];function post(cmd,name='',value=''){if(!focused)return;let id=focused;cmd=cmd.toString();name=name.toString();value=value.toString();let uri0=devices[id].prefix+'/'+id+'/'+cfg.hub_id+'/'+cmd;let uri=uri0;if(name)uri+='/'+name;if(value)uri+='='+value;switch(devices_t[id].conn){case Conn.SERIAL:break;case Conn.BT:break;case Conn.WS:ws_send(id,uri);break;case Conn.MQTT:mq_send(uri0+(name.length?('/'+name):''),value);break;}
+function parseCSV(str){const arr=[];let quote=false;for(let row=0,col=0,c=0;c<str.length;c++){let cc=str[c],nc=str[c+1];arr[row]=arr[row]||[];arr[row][col]=arr[row][col]||'';if(cc=='"'&&quote&&nc=='"'){arr[row][col]+=cc;++c;continue;}
+if(cc=='"'){quote=!quote;continue;}
+if(cc==','&&!quote){++col;continue;}
+if(cc=='\r'&&nc=='\n'&&!quote){++row;col=0;++c;continue;}
+if(cc=='\n'&&!quote){++row;col=0;continue;}
+if(cc=='\r'&&!quote){++row;col=0;continue;}
+arr[row][col]+=cc;}
+return arr;}
+function nextFile(){if(!files.length)return;fetch_to_file=true;if(devices_t[focused].conn==Conn.WS&&devices_t[focused].http_cfg.download&&files[0].path.startsWith(devices_t[focused].http_cfg.path)){downloadFile();EL('wlabel'+files[0].id).innerHTML=' [fetch...]';}else{fetch_path=files[0].path;post('fetch',fetch_path);}}
+async function downloadFile(){fetching=focused;fetch('http://'+devices[focused].ip+':'+http_port+files[0].path,{cache:"no-store"}).then((response)=>{response.blob().then(blob=>{try{const reader=new FileReader();reader.readAsDataURL(blob);reader.onload=function(){downloadFileEnd(this.result.split('base64,')[1]);};}catch(e){errorFile();}});}).catch((e)=>{errorFile();});}
+function downloadFileEnd(data){switch(files[0].type){case'img':EL(files[0].id).innerHTML=`<img style="width:100%" src="data:${getMime(files[0].path)};base64,${data}">`;EL('wlabel'+files[0].id).innerHTML='';break;}
+files.shift();nextFile();fetching=null;stopFS();}
+function processFile(perc){EL('wlabel'+files[0].id).innerHTML=` [${perc}%]`;}
+function errorFile(){EL('wlabel'+files[0].id).innerHTML=' [error]';files.shift();nextFile();}
+const http_port=80;const ws_port=81;const tout_prd=2800;const ping_prd=3000;const oninput_prd=100;const ws_tout=4000;let discovering=false;let mq_client;let mq_discover_flag=false;let mq_pref_list=[];let ws_focus_flag=false;let tout_interval=null;let ping_interval=null;let set_tout=null;let oninput_tout=null;let refresh_ui=false;let s_port=null,s_state=false,s_reader=null,s_buf='';const Conn={SERIAL:0,BT:1,WS:2,MQTT:3,NONE:4,ERROR:5,};const ConnNames=['Serial','BT','WS','MQTT','None','Error'];function post(cmd,name='',value=''){if(!focused)return;if(cmd=='set'&&!readModule(Modules.SET))return;if(cmd=='set'){if(set_tout)clearTimeout(set_tout);prev_set={name:name,value:value};set_tout=setTimeout(()=>{set_tout=prev_set=null;},tout_prd);}
+let id=focused;cmd=cmd.toString();name=name.toString();value=value.toString();let uri0=devices[id].prefix+'/'+id+'/'+hub.cfg.client_id+'/'+cmd;let uri=uri0;if(name)uri+='/'+name;if(value)uri+='='+value;switch(devices_t[id].conn){case Conn.SERIAL:serial_send(uri);break;case Conn.BT:bt_send(uri);break;case Conn.WS:ws_send(id,uri);break;case Conn.MQTT:mq_send(uri0+(name.length?('/'+name):''),value);break;}
 reset_ping();reset_tout();log('Post to #'+id+' via '+ConnNames[devices_t[id].conn]+', cmd='+cmd+(name?(', name='+name):'')+(value?(', value='+value):''))}
-function release_all(){if(pressId)post('click',pressId,0);pressId=null;}
-function click_h(name,dir){pressId=(dir==1)?name:null;post('click',name,dir);reset_ping();}
+function release_all(){if(pressId)post('set',pressId,0);pressId=null;}
+function click_h(name,dir){pressId=(dir==1)?name:null;post('set',name,dir);reset_ping();}
 function set_h(name,value=''){post('set',name,value);reset_ping();}
 function input_h(name,value){if(!(name in oninp_buffer))oninp_buffer[name]={'value':null,'tout':null};if(!oninp_buffer[name].tout){set_h(name,value);oninp_buffer[name].tout=setTimeout(()=>{if(oninp_buffer[name].value!=null&&!tout_interval)set_h(name,oninp_buffer[name].value);oninp_buffer[name].tout=null;oninp_buffer[name].value=null;},oninput_prd);}else{oninp_buffer[name].value=value;}}
 function reboot_h(){post('reboot');}
@@ -734,195 +879,244 @@ function change_conn(conn){EL('conn').innerHTML=ConnNames[conn];}
 function stop_tout(){refreshSpin(false);if(tout_interval)clearTimeout(tout_interval);tout_interval=null;}
 function reset_tout(){if(tout_interval)return;refreshSpin(true);tout_interval=setTimeout(function(){log('Connection lost');refresh_ui=true;change_conn(Conn.ERROR);showErr(true);stop_tout();},tout_prd);}
 function stop_ping(){if(ping_interval)clearInterval(ping_interval);ping_interval=null;}
-function reset_ping(){stop_ping();ping_interval=setInterval(()=>{if(refresh_ui){refresh_ui=false;post('focus');}else{post('ping');}},ping_prd);}
-function mq_start(){if(mq_client&&mq_client.connected)return;if(!cfg.mq_host||!cfg.mq_port)return;const url='wss://'+cfg.mq_host+':'+cfg.mq_port+'/mqtt';const options={keepalive:60,clientId:'HUB-'+Math.round(Math.random()*0xffffffff).toString(16),username:cfg.mq_login,password:cfg.mq_pass,protocolId:'MQTT',protocolVersion:4,clean:true,reconnectPeriod:1000,connectTimeout:20*1000}
-try{mq_client=mqtt.connect(url,options);}catch(e){showPopupError('MQTT error');log('MQTT error');mq_show_err(1);return;}
-mq_client.on('connect',function(){showPopup('MQTT connected');log('MQTT connected');mq_show_err(0);mq_client.subscribe(cfg.prefix+'/hub');mq_pref_list=[cfg.prefix];mq_client.subscribe(cfg.prefix+'/hub/'+cfg.hub_id+'/#');for(let id in devices){if(!mq_pref_list.includes(devices[id].prefix)){mq_client.subscribe(devices[id].prefix+'/hub/'+cfg.hub_id+'/#');mq_pref_list.push(devices[id].prefix);}
+function reset_ping(){stop_ping();ping_interval=setInterval(()=>{if(refresh_ui){refresh_ui=false;if(screen=='info')post('info');else if(screen=='fsbr')post('fsbr');else post('focus');}else{post('ping');}},ping_prd);}
+function parsePacket(id,text,conn){function checkPacket(){if(devices_t[id]['buffer'][ConnNames[conn]].endsWith('}\n')){if(devices_t[id]['buffer'][ConnNames[conn]].startsWith('\n{'))parseDevice(id,devices_t[id]['buffer'][ConnNames[conn]],conn);devices_t[id]['buffer'][ConnNames[conn]]='';}}
+if(conn==Conn.BT||conn==Conn.SERIAL){for(let i=0;i<text.length;i++){devices_t[id]['buffer'][ConnNames[conn]]+=text[i];checkPacket();}}else{devices_t[id]['buffer'][ConnNames[conn]]+=text;checkPacket();}}
+function mq_start(){if(mq_client&&mq_client.connected)return;if(!hub.cfg.mq_host||!hub.cfg.mq_port)return;const url='wss://'+hub.cfg.mq_host+':'+hub.cfg.mq_port+'/mqtt';const options={keepalive:60,clientId:'HUB-'+Math.round(Math.random()*0xffffffff).toString(16),username:hub.cfg.mq_login,password:hub.cfg.mq_pass,protocolId:'MQTT',protocolVersion:4,clean:true,reconnectPeriod:1000,connectTimeout:20*1000}
+try{mq_client=mqtt.connect(url,options);}catch(e){mq_show_icon(0);return;}
+mq_client.on('connect',function(){mq_show_icon(1);mq_client.subscribe(hub.cfg.prefix+'/hub');mq_pref_list=[hub.cfg.prefix];mq_client.subscribe(hub.cfg.prefix+'/hub/'+hub.cfg.client_id+'/#');for(let id in devices){if(!mq_pref_list.includes(devices[id].prefix)){mq_client.subscribe(devices[id].prefix+'/hub/'+hub.cfg.client_id+'/#');mq_pref_list.push(devices[id].prefix);}
 mq_client.subscribe(devices[id].prefix+'/hub/'+id+'/get/#');}
-if(mq_discover_flag){mq_discover_flag=false;mq_discover();}});mq_client.on('error',function(){showPopupError('MQTT error');log('MQTT error');mq_show_err(1);mq_client.end();});mq_client.on('close',function(){showPopupError('MQTT closed');log('MQTT closed');mq_show_err(1);mq_client.end();});mq_client.on('message',function(topic,text){topic=topic.toString();text=text.toString();for(pref of mq_pref_list){if(topic==(pref+'/hub')){parseDevice('broadcast',text,Conn.MQTT);}else if(topic.startsWith(pref+'/hub/'+cfg.hub_id+'/')){let id=topic.split('/').slice(-1);if(!(id in devices)){parseDevice(id,text,Conn.MQTT);return;}
-let st=text.startsWith('\n{');let end=text.endsWith('}\n');if(st&&end)parseDevice(id,text,Conn.MQTT);else if(st){devices_t[id].buffer.mq=text;}else if(end){log('End MQTT UI chunk #'+id);devices_t[id].buffer.mq+=text;parseDevice(id,devices_t[id].buffer.mq,Conn.MQTT);}else{devices_t[id].buffer.mq+=text;}}else if(topic.startsWith(pref+'/hub/')&&topic.includes('/get/')){let idname=topic.split(pref+'/hub/')[1].split('/get/');if(idname[0]!=focused||idname.length!=2)return;log('Got GET from id='+idname[0]+', name='+idname[1]+', value='+text);applyUpdate(idname[1],text);stop_tout();}else{log('Got MQTT unknown');}}});}
+if(mq_discover_flag){mq_discover_flag=false;mq_discover();}});mq_client.on('error',function(){mq_show_icon(0);mq_client.end();});mq_client.on('close',function(){mq_show_icon(0);mq_client.end();});mq_client.on('message',function(topic,text){topic=topic.toString();text=text.toString();for(pref of mq_pref_list){if(topic==(pref+'/hub')){parseDevice('broadcast',text,Conn.MQTT);}else if(topic.startsWith(pref+'/hub/'+hub.cfg.client_id+'/')){let id=topic.split('/').slice(-1);if(!(id in devices)||!(id in devices_t)){parseDevice(id,text,Conn.MQTT);return;}
+parsePacket(id,text,Conn.MQTT);}else if(topic.startsWith(pref+'/hub/')&&topic.includes('/get/')){let idname=topic.split(pref+'/hub/')[1].split('/get/');if(idname[0]!=focused||idname.length!=2)return;log('Got GET from id='+idname[0]+', name='+idname[1]+', value='+text);applyUpdate(idname[1],text);stop_tout();}else{log('Got MQTT unknown');}}});}
 function mq_stop(){if(mq_state())mq_client.end();}
 function mq_send(topic,msg=''){if(mq_state())mq_client.publish(topic,msg);}
 function mq_state(){return(mq_client&&mq_client.connected);}
-function mq_discover(){if(!mq_state())mq_discover_flag=true;else for(let id in devices){mq_send(devices[id].prefix+'/'+id,cfg.hub_id);}
+function mq_discover(){if(!mq_state())mq_discover_flag=true;else for(let id in devices){mq_send(devices[id].prefix+'/'+id,hub.cfg.client_id);}
 log('MQTT discover');}
-function mq_discover_all(){if(!mq_state())return;if(!(cfg.prefix in mq_pref_list)){mq_client.subscribe(cfg.prefix+'/hub');mq_pref_list.push(cfg.prefix);}
-mq_send(cfg.prefix,cfg.hub_id);log('MQTT discover all');}
-function mq_show_err(state){EL('head_err').style.display=(state&&cfg.use_mqtt)?'unset':'none';}
-function ws_start(id){if(!cfg.use_ws)return;if(devices_t[id].ws)return;if(devices[id].ip=='unset')return;log(`WS ${id} open...`);devices_t[id].ws=new WebSocket(`ws://${devices[id].ip}:${ws_port}/`,['hub']);devices_t[id].ws.onopen=function(){log(`WS ${id} opened`);if(ws_focus_flag){ws_focus_flag=false;post('focus');}
-if(id!=focused)devices_t[id].ws.close();};devices_t[id].ws.onclose=function(){log(`WS ${id} closed`);devices_t[id].ws=null;ws_focus_flag=false;if(id==focused)setTimeout(()=>ws_start(id),500);};devices_t[id].ws.onerror=function(){log(`WS ${id} error`);};devices_t[id].ws.onmessage=function(event){reset_tout();let st=event.data.startsWith('\n{');let end=event.data.endsWith('}\n');if(st&&end)parseDevice(id,event.data,Conn.WS);else if(st){devices_t[id].buffer.ws=event.data;}else if(end){log('End WS UI chunk #'+id);devices_t[id].buffer.ws+=event.data;parseDevice(id,devices_t[id].buffer.ws,Conn.WS);}else{devices_t[id].buffer.ws+=event.data;}};}
+function mq_discover_all(){if(!mq_state())return;if(!(hub.cfg.prefix in mq_pref_list)){mq_client.subscribe(hub.cfg.prefix+'/hub');mq_pref_list.push(hub.cfg.prefix);mq_client.subscribe(hub.cfg.prefix+'/hub/'+hub.cfg.client_id+'/#');}
+mq_send(hub.cfg.prefix,hub.cfg.client_id);log('MQTT discover all');}
+function mq_show_icon(state){EL('mqtt_ok').style.display=state?'inline-block':'none';}
+function ws_start(id){if(!hub.cfg.use_ws)return;checkHTTP(id);if(devices_t[id].ws)return;if(devices[id].ip=='unset')return;log(`WS ${id} open...`);devices_t[id].ws=new WebSocket(`ws://${devices[id].ip}:${ws_port}/`,['hub']);devices_t[id].ws.onopen=function(){log(`WS ${id} opened`);if(ws_focus_flag){ws_focus_flag=false;post('focus');}
+if(id!=focused)devices_t[id].ws.close();};devices_t[id].ws.onclose=function(){log(`WS ${id} closed`);devices_t[id].ws=null;ws_focus_flag=false;if(id==focused)setTimeout(()=>ws_start(id),500);};devices_t[id].ws.onerror=function(){log(`WS ${id} error`);};devices_t[id].ws.onmessage=function(event){reset_tout();parsePacket(id,event.data,Conn.WS);};}
 function ws_stop(id){if(!devices_t[id].ws||devices_t[id].ws.readyState>=2)return;log(`WS ${id} close...`);devices_t[id].ws.close();}
 function ws_state(id){return(devices_t[id].ws&&devices_t[id].ws.readyState==1);}
 function ws_send(id,text){if(ws_state(id))devices_t[id].ws.send(text.toString()+'\0');}
 function ws_discover(){for(let id in devices){if(devices[id].ip=='unset')continue;ws_discover_ip(devices[id].ip,id);log('WS discover');}}
-function ws_discover_ip(ip,id='broadcast'){let ws=new WebSocket(`ws://${ip}:${ws_port}/`,['hub']);let tout=setTimeout(()=>{if(ws)ws.close();},ws_tout);ws.onopen=()=>ws.send(cfg.prefix+(id!='broadcast'?('/'+id):'')+'\0');ws.onerror=()=>ws.close();ws.onclose=()=>ws=null;ws.onmessage=function(event){clearTimeout(tout);parseDevice(id,event.data,Conn.WS,ip);ws.close();};}
+function ws_discover_ip(ip,id='broadcast'){let ws=new WebSocket(`ws://${ip}:${ws_port}/`,['hub']);let tout=setTimeout(()=>{if(ws)ws.close();},ws_tout);ws.onopen=()=>ws.send(hub.cfg.prefix+(id!='broadcast'?('/'+id):'')+'\0');ws.onerror=()=>ws.close();ws.onclose=()=>ws=null;ws.onmessage=function(event){clearTimeout(tout);parseDevice(id,event.data,Conn.WS,ip);ws.close();};}
 function ws_discover_ips(ips){discovering=true;refreshSpin(true);setTimeout(()=>{refreshSpin(false);discovering=false;},ws_tout/200*ips.length);for(let i in ips){setTimeout(()=>ws_discover_ip(ips[i]),ws_tout/200*i);}
 log('WS discover all');}
 function http_hook(ips){discovering=true;refreshSpin(true);setTimeout(()=>{refreshSpin(false);discovering=false;},ws_tout);function hook(ip){try{let xhr=new XMLHttpRequest();xhr.onreadystatechange=function(){if(this.readyState==4&&this.status==200){if(this.responseText=='OK')ws_discover_ip(ip);}}
 xhr.timeout=tout_prd;xhr.open("GET",'http://'+ip+':'+http_port+'/hub_discover_all');xhr.send();}catch(e){}}
 for(let i in ips){setTimeout(()=>hook(ips[i]),10*i);}
 log('WS hook discover all');}
-function ws_discover_all(){let ip_arr=getIPs();if(ip_arr==null)return;if(cfg.use_hook)http_hook(ip_arr);else ws_discover_ips(ip_arr);}
+function ws_discover_all(){let ip_arr=getIPs();if(ip_arr==null)return;if(hub.cfg.use_hook)http_hook(ip_arr);else ws_discover_ips(ip_arr);}
 function manual_ws_h(ip){if(!checkIP(ip)){showPopupError('Wrong IP!');return;}
 log('WS manual '+ip);ws_discover_ip(ip);back_h();}
-let fs_arr=[];let fetching=null;let fetch_name;let fetch_index;let fetch_file='';let fetch_tout;let uploading=null;let upload_tout;let upload_bytes=[];let upload_size;let ota_tout;function stopFS(){stop_fetch_tout();stop_upload_tout();stop_ota_tout();upload_bytes=[];fetching=null;uploading=null;}
+function checkHTTP(id){if(devices_t[id].http_cfg.upd)return;let xhr=new XMLHttpRequest();xhr.onreadystatechange=function(){if(this.readyState==4&&this.status==200){devices_t[id].http_cfg.upd=1;let resp;try{resp=JSON.parse(this.responseText);}catch(e){return;}
+for(let i in resp){if(resp[i])devices_t[id].http_cfg[i]=resp[i];}}}
+xhr.timeout=tout_prd;xhr.open("GET",'http://'+devices[id].ip+':'+http_port+'/hub_http_cfg');xhr.send();}
+async function serial_select(){await serial_stop();const ports=await navigator.serial.getPorts();for(let port of ports)await port.forget();try{await navigator.serial.requestPort();}catch(e){}
+serial_change();}
+async function serial_discover(){serial_send(hub.cfg.prefix);}
+async function serial_start(){try{s_state=true;const ports=await navigator.serial.getPorts();if(!ports.length)return;s_port=ports[0];await s_port.open({baudRate:hub.cfg.ser_baud});log('[Serial] Open');serial_show_icon(true);if(s_buf){setTimeout(function(){serial_send(s_buf);s_buf='';},2000);}
+while(s_port.readable){s_reader=s_port.readable.getReader();let buffer='';try{while(true&&s_state){const{value,done}=await s_reader.read();if(done)break;const data=new TextDecoder().decode(value);if(focused){parsePacket(focused,data,Conn.SERIAL);}else{buffer+=data;if(buffer.endsWith("}\n")){parseDevice('broadcast',buffer,Conn.SERIAL);buffer='';}}}}catch(error){log("[Serial] "+error);}finally{await s_reader.releaseLock();await s_port.close();log('[Serial] Close');break;}}}catch(error){log("[Serial] "+error);}
+s_reader=null;s_state=false;serial_show_icon(false);}
+async function serial_send(text){if(!s_state){serial_start();s_buf=text;return;}
+try{const encoder=new TextEncoder();const writer=s_port.writable.getWriter();await writer.write(encoder.encode(text+'\0'));writer.releaseLock();}catch(e){log("[Serial] "+e);}}
+async function serial_stop(){if(s_reader)s_reader.cancel();s_state=false;}
+function serial_toggle(){if(s_state)serial_stop();else serial_start();}
+function serial_show_icon(state){EL('serial_ok').style.display=state?'inline-block':'none';}
+async function serial_change(){serial_show_icon(0);if(s_state)await serial_stop();const ports=await navigator.serial.getPorts();EL('serial_btn').style.display=ports.length?'inline-block':'none';}
+function bt_discover(){hub.bt.send(hub.cfg.prefix);}
+function bt_toggle(){if(!hub.bt.state()){hub.bt.open();EL('bt_device').innerHTML='Connecting...';}else hub.bt.close();}
+function bt_send(text){hub.bt.send(text);}
+function bt_show_ok(state){EL('bt_ok').style.display=state?'inline-block':'none';}
+hub.bt.onopen=function(){EL('bt_btn').innerHTML='Disconnect';EL('bt_device').innerHTML=hub.bt.getName();bt_show_ok(true);}
+hub.bt.onclose=function(){EL('bt_btn').innerHTML='Connect';EL('bt_device').innerHTML='Not Connected';bt_show_ok(false);}
+hub.bt.onerror=function(e){EL('bt_device').innerHTML='Not Connected';bt_show_ok(false);}
+let bt_buffer='';hub.bt.onmessage=function(data){if(focused){parsePacket(focused,data,Conn.BT);}else{bt_buffer+=data;if(bt_buffer.endsWith("}\n")){parseDevice('broadcast',bt_buffer,Conn.BT);bt_buffer='';}}}
+let fs_arr=[];let fetching=null;let fetch_name;let fetch_index;let fetch_file='';let fetch_path='';let fetch_tout;let fetch_to_file=false;let edit_idx=0;let uploading=null;let upload_tout;let upload_bytes=[];let upload_size;let ota_tout;function stopFS(){if(fetching)post('fetch_stop',fetch_path);stop_fetch_tout();stop_upload_tout();stop_ota_tout();upload_bytes=[];fetching=null;uploading=null;}
 function stop_fetch_tout(){if(fetch_tout)clearTimeout(fetch_tout);}
-function reset_fetch_tout(){stop_fetch_tout();fetch_tout=setTimeout(()=>{stopFS();EL('process#'+fetch_index).innerHTML='Error!';},tout_prd);}
+function reset_fetch_tout(){stop_fetch_tout();fetch_tout=setTimeout(()=>{stopFS();if(!fetch_to_file)EL('process#'+fetch_index).innerHTML='Error!';},tout_prd);}
 function stop_upload_tout(){if(upload_tout)clearTimeout(upload_tout);}
 function reset_upload_tout(){stop_upload_tout();upload_tout=setTimeout(()=>{stopFS();EL('file_upload_btn').innerHTML='Error!';setTimeout(()=>EL('file_upload_btn').innerHTML='Upload',2000);},tout_prd);}
 function stop_ota_tout(){if(ota_tout)clearTimeout(ota_tout);}
 function reset_ota_tout(){stop_ota_tout();ota_tout=setTimeout(()=>{stopFS();EL('ota_label').innerHTML='Error!';setTimeout(()=>EL('ota_label').innerHTML='IDLE',3000);},tout_prd);}
-function showFsbr(device){fs_arr=[];for(let path in device.fs)fs_arr.push(path);fs_arr=sortPaths(fs_arr,'/');let inner='';for(let i in fs_arr){if(fs_arr[i].endsWith('/')){inner+=`<div class="fs_file fs_folder" onclick="file_upload_path.value='${fs_arr[i]}'/*;file_upload_btn.click()*/">${fs_arr[i]}</div>`;}else{inner+=`<div class="fs_file" onclick="openFSctrl(${i})">${fs_arr[i]}<div class="fs_weight">${(device.fs[fs_arr[i]] / 1000).toFixed(2)} kB</div></div>
+function showFsbr(device){fs_arr=[];for(let path in device.fs)fs_arr.push(path);fs_arr=sortPaths(fs_arr,'/');let inner='';for(let i in fs_arr){if(fs_arr[i].endsWith('/')){inner+=`<div class="fs_file fs_folder drop_area" onclick="file_upload_path.value='${fs_arr[i]}'/*;file_upload_btn.click()*/" ondrop="uploadFile(event.dataTransfer.files[0],'${fs_arr[i]}')">${fs_arr[i]}</div>`;}else{let none="style='display:none'";inner+=`<div class="fs_file" onclick="openFSctrl(${i})">${fs_arr[i]}<div class="fs_weight">${(device.fs[fs_arr[i]] / 1000).toFixed(2)} kB</div></div>
 <div id="fs#${i}" class="fs_controls">
-<button title="Rename" class="icon cfg_btn_tab" onclick="renameFile(${i})"></button>
-<button title="Delete" class="icon cfg_btn_tab" onclick="deleteFile(${i})"></button>
-<button title="Fetch" class="icon cfg_btn_tab" onclick="fetchFile(${i})"></button>
+<button ${readModule(Modules.RENAME) ? '' : none} title="Rename" class="icon cfg_btn_tab" onclick="renameFile(${i})"></button>
+<button ${readModule(Modules.DELETE) ? '' : none} title="Delete" class="icon cfg_btn_tab" onclick="deleteFile(${i})"></button>
+<button ${readModule(Modules.DOWNLOAD) ? '' : none} title="Fetch" class="icon cfg_btn_tab" onclick="fetchFile(${i})"></button>
 <label id="process#${i}"></label>
 <a id="download#${i}" title="Download" class="icon cfg_btn_tab" href="" download="" style="display:none"></a>
 <button id="open#${i}" title="Open" class="icon cfg_btn_tab" onclick="openFile(EL('download#${i}').href)" style="display:none"></button>
+<button ${readModule(Modules.UPLOAD) ? '' : none} id="edit#${i}" title="Edit" class="icon cfg_btn_tab" onclick="editFile(EL('download#${i}').href,'${i}')" style="display:none"></button>
 </div>`;}}
-inner+=`<div class="fs_info">Used ${(device.used / 1000).toFixed(2)} kB (${Math.round(device.used / device.total * 100)}%) from ${(device.total / 1000).toFixed(2)} kB (${((device.total - device.used) / 1000).toFixed(2)} kB free)</div>`;EL('fsbr_inner').innerHTML=inner;let accept=device.gzip?'.gz':'.bin';EL('ota_upload').accept=accept;EL('ota_upload_fs').accept=accept;EL('ota_url_f').value="http://url_to_flash"+accept;EL('ota_url_fs').value="http://url_to_filesystem"+accept;}
+if(device.total)inner+=`<div class="fs_info">Used ${(device.used / 1000).toFixed(2)}/${(device.total / 1000).toFixed(2)} kB [${Math.round(device.used / device.total * 100)}%]</div>`;else inner+=`<div class="fs_info">Used ${(device.used / 1000).toFixed(2)} kB</div>`;EL('fsbr_inner').innerHTML=inner;let ota_t='.'+devices[focused].ota_t;EL('ota_upload').accept=ota_t;EL('ota_upload_fs').accept=ota_t;EL('ota_url_f').value="http://url_to_flash"+ota_t;EL('ota_url_fs').value="http://url_to_filesystem"+ota_t;}
 function openFSctrl(i){let current=EL(`fs#${i}`).style.display=='flex';document.querySelectorAll('.fs_controls').forEach(el=>el.style.display='none');if(!current)EL(`fs#${i}`).style.display='flex';}
 function renameFile(i){if(fetching||uploading){showPopupError('Busy');return;}
 let path=fs_arr[i];let res=prompt('Rename '+path+' to',path);if(res&&res!=path)post('rename',path,res);}
 function deleteFile(i){if(fetching||uploading){showPopupError('Busy');return;}
 let path=fs_arr[i];if(confirm('Delete '+path+'?'))post('delete',path);}
 function fetchFile(i){if(fetching||uploading){showPopupError('Busy');return;}
-EL('download#'+i).style.display='none';EL('open#'+i).style.display='none';EL('process#'+i).style.display='unset';EL('process#'+i).innerHTML='';let path=fs_arr[i];fetch_index=i;fetch_name=path.split('/').pop();post('fetch',path);}
-function openFile(src){let w=window.open();w.document.write('<iframe src="'+src+'" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>');}
+EL('download#'+i).style.display='none';EL('open#'+i).style.display='none';EL('process#'+i).style.display='unset';EL('process#'+i).innerHTML='';fetch_path=fs_arr[i];fetch_index=i;fetch_name=fetch_path.split('/').pop();fetch_to_file=false;if(devices_t[focused].conn==Conn.WS&&devices_t[focused].http_cfg.download&&fetch_path.startsWith(devices_t[focused].http_cfg.path))fetchHTTP(fetch_path,fetch_name,fetch_index)
+else post('fetch',fetch_path);}
+function openFile(src){let w=window.open();src=w.document.write('<iframe src="'+src+'" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>');}
 function format_h(){if(confirm('Format filesystem?'))post('format');}
-function uploadFile(arg){if(fetching||uploading){showPopupError('Busy');return;}
-let reader=new FileReader();reader.onload=function(e){if(!e.target.result)return;let buffer=new Uint8Array(e.target.result);if(!confirm('Upload '+file_upload_path.value+arg.files[0].name+' ('+buffer.length+' bytes)?'))return;upload_bytes=[];for(b of buffer)upload_bytes.push(b);upload_size=upload_bytes.length;post('upload',file_upload_path.value+arg.files[0].name);arg.value=null;}
-reader.readAsArrayBuffer(arg.files[0]);}
+function updatefs_h(){post('fsbr');}
+function editFile(data,idx){function b64ToText(base64){const binString=atob(base64);return new TextDecoder().decode(Uint8Array.from(binString,(m)=>m.codePointAt(0)));}
+EL('editor_area').value=b64ToText(data.split('base64,')[1]);EL('editor_area').scrollTop=0;EL('fsbr').style.display='none';EL('fsbr_edit').style.display='block';edit_idx=idx;}
+function editor_save(){editor_cancel();let div=fs_arr[edit_idx].lastIndexOf('/');let path=fs_arr[edit_idx].slice(0,div);let name=fs_arr[edit_idx].slice(div+1);uploadFile(new File([EL('editor_area').value],name,{type:getMime(name),lastModified:new Date()}),path);}
+function editor_cancel(){EL('fsbr').style.display='block';EL('fsbr_edit').style.display='none';}
+async function fetchHTTP(path,name,index){EL('process#'+index).innerHTML='Fetching...';fetching=focused;fetch('http://'+devices[focused].ip+':'+http_port+path,{cache:"no-store"}).then((response)=>{response.blob().then(blob=>{try{const reader=new FileReader();reader.readAsDataURL(blob);reader.onload=function(){fetchEnd(name,index,this.result.split('base64,')[1]);};}catch(e){showPopupError('Error fetch '+path);}});}).catch((e)=>{showPopupError('Error fetch '+path);});}
+function fetchEnd(name,index,data){if(!fetching)return;EL('download#'+index).style.display='inline-block';EL('download#'+index).href=('data:'+getMime(name)+';base64,'+data);EL('download#'+index).download=name;EL('open#'+index).style.display='inline-block';EL('edit#'+index).style.display='inline-block';EL('process#'+index).style.display='none';fetching=null;stopFS();}
+function uploadFile(file,path){if(fetching||uploading){showPopupError('Busy');return clearFiles();}
+let reader=new FileReader();reader.readAsArrayBuffer(file);reader.onload=function(e){if(!e.target.result)return clearFiles();let buffer=new Uint8Array(e.target.result);if(!path.startsWith('/'))path='/'+path;if(!path.endsWith('/'))path+='/';path+=file.name;if(!confirm('Upload '+path+' ('+buffer.length+' bytes)?'))return clearFiles();if(devices_t[focused].conn==Conn.WS&&devices_t[focused].http_cfg.upload){EL('file_upload_btn').innerHTML='Wait...';let xhr=new XMLHttpRequest();let formData=new FormData();formData.append('upload',file,path);xhr.onreadystatechange=function(){if(this.responseText=='OK')showPopup('Done');if(this.responseText=='FAIL')showPopupError('Error');}
+xhr.onload=()=>{setLabelTout('file_upload_btn','Done','Upload');post('fsbr');}
+xhr.onerror=()=>{setLabelTout('file_upload_btn','Error!','Upload');}
+xhr.open("POST",'http://'+devices[focused].ip+':'+http_port+'/upload');xhr.send(formData);}else{upload_bytes=[];for(b of buffer)upload_bytes.push(b);upload_size=upload_bytes.length;post('upload',path);}
+clearFiles();}}
 function uploadNextChunk(){let i=0;let data='';while(true){if(!upload_bytes.length)break;i++;data+=String.fromCharCode(upload_bytes.shift());if(i>=devices[focused].max_upl*3/4)break;}
 EL('file_upload_btn').innerHTML=Math.round((upload_size-upload_bytes.length)/upload_size*100)+'%';post('upload_chunk',(upload_bytes.length)?'next':'last',window.btoa(data));}
-function uploadOta(arg,type){if(fetching||uploading){showPopupError('Busy');return;}
-if(!confirm('Upload OTA '+type+'?'))return;let reader=new FileReader();reader.onload=function(e){if(!e.target.result)return;let buffer=new Uint8Array(e.target.result);upload_bytes=[];for(b of buffer)upload_bytes.push(b);upload_size=upload_bytes.length;post('ota',type);arg.value=null;}
-reader.readAsArrayBuffer(arg.files[0]);}
+function clearFiles(){EL('file_upload').value='';EL('ota_upload').value='';EL('ota_upload_fs').value='';}
+function uploadOta(file,type){if(fetching||uploading){showPopupError('Busy');return clearFiles();}
+if(!file.name.endsWith(devices[focused].ota_t)){alert('Wrong file! Use .'+devices[focused].ota_t);return clearFiles();}
+if(!confirm('Upload OTA '+type+'?'))return clearFiles();let reader=new FileReader();reader.readAsArrayBuffer(file);reader.onload=function(e){if(!e.target.result)return clearFiles();if(devices_t[focused].http_cfg.ota){EL('ota_label').innerHTML='WAIT...';let xhr=new XMLHttpRequest();let formData=new FormData();formData.append(type,file,file.name);xhr.onreadystatechange=function(){if(this.responseText=='OK')showPopup('Done');if(this.responseText=='FAIL')showPopupError('Error');}
+xhr.onload=()=>{setLabelTout('ota_label','DONE','IDLE');}
+xhr.onerror=()=>{setLabelTout('ota_label','ERROR','IDLE');}
+xhr.open("POST",'http://'+devices[focused].ip+':'+http_port+'/ota?type='+type);xhr.send(formData);}else{let buffer=new Uint8Array(e.target.result);upload_bytes=[];for(b of buffer)upload_bytes.push(b);upload_size=upload_bytes.length;post('ota',type);}
+clearFiles();}}
 function otaNextChunk(){let i=0;let data='';while(true){if(!upload_bytes.length)break;i++;data+=String.fromCharCode(upload_bytes.shift());if(i>=devices[focused].max_upl*3/4)break;}
 EL('ota_label').innerHTML=Math.round((upload_size-upload_bytes.length)/upload_size*100)+'%';post('ota_chunk',(upload_bytes.length)?'next':'last',window.btoa(data));}
-function otaUrl(url,type){post('ota_url',type,url);}
-let push_timer=0;function applyUpdate(name,value){if(name in prompts){release_all();let res=prompt(value?value:prompts[name].label,prompts[name].value);if(res!==null){prompts[name].value=res;set_h(name,res);}
+function otaUrl(url,type){post('ota_url',type,url);showPopup('OTA start');}
+let push_timer=0;let delay_tmr=null;let prev_set=null;function applyUpdate(name,value){if(screen!='device')return;if(prev_set&&prev_set.name==name&&prev_set.value==value){prev_set=null;return;}
+if(name in prompts){release_all();let res=prompt(value?value:prompts[name].label,prompts[name].value);if(res!==null){prompts[name].value=res;set_h(name,res);}
 return;}
-if(name in confirms){release_all();log(confirms[name].label);let res=confirm(value?value:confirms[name].label);set_h(name,res?1:0);return;}
-let el=EL('#'+name);if(!el)return;cl=el.classList;if(cl.contains('icon_t'))el.style.color=value;else if(cl.contains('text_t'))el.innerHTML=value;else if(cl.contains('input_t'))el.value=value;else if(cl.contains('date_t'))el.value=new Date(ctrl.value*1000).toISOString().split('T')[0];else if(cl.contains('time_t'))el.value=new Date(ctrl.value*1000).toISOString().split('T')[1].split('.')[0];else if(cl.contains('datetime_t'))el.value=new Date(ctrl.value*1000).toISOString().split('.')[0];else if(cl.contains('slider_t'))el.value=value,EL('out#'+name).innerHTML=value,moveSlider(el,false);else if(cl.contains('switch_t'))el.checked=(value=='1');else if(cl.contains('select_t'))el.value=value;else if(cl.contains('canvas_t')){if(name in canvases){if(!canvases[name].value){canvases[name].value=value;drawCanvas(canvases[name]);}}}
+if(name in confirms){release_all();let res=confirm(value?value:confirms[name].label);set_h(name,res?1:0);return;}
+if(name in pickers){pickers[name].setColor(intToCol(value));return;}
+let el=EL('#'+name);if(!el)return;cl=el.classList;if(cl.contains('icon_t'))el.style.color=value;else if(cl.contains('text_t'))el.innerHTML=value;else if(cl.contains('input_t'))el.value=value;else if(cl.contains('date_t'))el.value=new Date(value*1000).toISOString().split('T')[0];else if(cl.contains('time_t'))el.value=new Date(value*1000).toISOString().split('T')[1].split('.')[0];else if(cl.contains('datetime_t'))el.value=new Date(value*1000).toISOString().split('.')[0];else if(cl.contains('slider_t'))el.value=value,EL('out#'+name).innerHTML=value,moveSlider(el,false);else if(cl.contains('switch_t'))el.checked=(value=='1');else if(cl.contains('select_t'))el.value=value;else if(cl.contains('image_t')){files.push({id:'#'+name,path:(value?value:EL('#'+name).getAttribute("name")),type:'img'});EL('wlabel#'+name).innerHTML=' [0%]';if(files.length==1)nextFile();}
+else if(cl.contains('canvas_t')){if(name in canvases){if(!canvases[name].value){canvases[name].value=value;drawCanvas(canvases[name]);}}}
 else if(cl.contains('gauge_t')){if(name in gauges){gauges[name].value=Number(value);drawGauge(gauges[name]);}}
 else if(cl.contains('flags_t')){let flags=document.getElementById('#'+name).getElementsByTagName('input');let val=value;for(let i=0;i<flags.length;i++){flags[i].checked=val&1;val>>=1;}}}
-function updateDevice(mem,dev){mem.id=dev.id;mem.name=dev.name;mem.icon=dev.icon;mem.PIN=dev.PIN;mem.version=dev.version;mem.max_upl=dev.max_upl;mem.esp=dev.esp;save_devices();}
-function compareDevice(mem,dev){return mem.id!=dev.id||mem.name!=dev.name||mem.icon!=dev.icon||mem.PIN!=dev.PIN||mem.version!=dev.version||mem.max_upl!=dev.max_upl||mem.esp!=dev.esp;}
-function parseDevice(fromID,text,conn,ip='unset'){let device;try{device=JSON.parse(text.replaceAll("\'","\""));}catch(e){log('Wrong packet (JSON)');return;}
-let id=device.id;if(!id)return log('Wrong packet (ID)');if(fromID!='broadcast'&&fromID!=id)return log('Wrong packet (Unknown ID)');if(fromID=='broadcast'&&device.type!='discover'&&device.type!='update'&&device.type!='push'&&device.type!='print')return log('Wrong packet (error)');log('Got packet from #'+id+' '+device.type+' via '+ConnNames[conn]);if(id==focused){stop_tout();showErr(false);change_conn(devices_t[focused].conn);}
-switch(device.type){case'alert':alert(device.text);break;case'notice':showPopup(device.text,intToCol(device.color));break;case'OK':break;case'ERR':showPopupError('Error');break;case'discover':if(focused)return;if(id in devices){let upd=false;if(compareDevice(devices[id],device))upd=true;if(devices[id].ip=='unset'&&ip!='unset'){devices[id].ip=ip;upd=true;}
-if(upd){log('Update device #'+id);updateDevice(devices[id],device);EL(`icon#${id}`).innerHTML=device.icon?device.icon:'';EL(`name#${id}`).innerHTML=device.name?device.name:'Unknown';}}else{log('Add new device #'+id);devices[id]={prefix:cfg.prefix,break_widgets:false,show_names:false,skip_version:device.version,ip:ip};updateDevice(devices[id],device);if(mq_state()){mq_client.subscribe(devices[id].prefix+'/hub/'+id+'/get/#');mq_client.subscribe(devices[id].prefix+'/hub/'+cfg.hub_id+'/#');if(!mq_pref_list.includes(devices[id].prefix))mq_pref_list.push(devices[id].prefix);}
+function updateDevice(mem,dev){mem.id=dev.id;mem.name=dev.name;mem.icon=dev.icon;mem.PIN=dev.PIN;mem.version=dev.version;mem.max_upl=dev.max_upl;mem.modules=dev.modules;mem.ota_t=dev.ota_t;save_devices();}
+function compareDevice(mem,dev){return mem.id!=dev.id||mem.name!=dev.name||mem.icon!=dev.icon||mem.PIN!=dev.PIN||mem.version!=dev.version||mem.max_upl!=dev.max_upl||mem.modules!=dev.modules||mem.ota_t!=dev.ota_t;}
+function parseDevice(fromID,text,conn,ip='unset'){let device;try{device=JSON.parse(text.replaceAll("\'","\""));}catch(e){log('Wrong packet (JSON):'+text);return;}
+let id=device.id;if(!id)return log('Wrong packet (ID)');if(fromID!='broadcast'&&fromID!=id)return log('Wrong packet (Unknown ID)');if(fromID=='broadcast'&&device.type!='discover'&&device.type!='update'&&device.type!='push'&&device.type!='print'&&device.type!='data')return log('Wrong packet (error)');log('Got packet from #'+id+' '+device.type+' via '+ConnNames[conn]);if(id==focused){stop_tout();showErr(false);change_conn(devices_t[focused].conn);}
+switch(device.type){case'data':break;case'alert':release_all();alert(device.text);break;case'notice':showPopup(device.text,intToCol(device.color));break;case'OK':break;case'ERR':showPopupError(device.text);break;case'discover':if(focused)return;if(device.modules==undefined)device.modules=0;if(device.ota_t==undefined)device.ota_t='bin';if(id in devices){let upd=false;if(compareDevice(devices[id],device))upd=true;if(devices[id].ip=='unset'&&ip!='unset'){devices[id].ip=ip;upd=true;}
+if(upd){log('Update device #'+id);updateDevice(devices[id],device);if(device.icon.length)EL(`icon#${id}`).innerHTML=device.icon;EL(`name#${id}`).innerHTML=device.name?device.name:'Unknown';}}else{log('Add new device #'+id);devices[id]={prefix:hub.cfg.prefix,break_widgets:false,show_names:false,ip:ip};updateDevice(devices[id],device);if(mq_state()){mq_client.subscribe(devices[id].prefix+'/hub/'+id+'/get/#');mq_client.subscribe(devices[id].prefix+'/hub/'+hub.cfg.client_id+'/#');if(!mq_pref_list.includes(devices[id].prefix))mq_pref_list.push(devices[id].prefix);}
 addDevice(id);}
-if(!(id in devices_t)){devices_t[id]={conn:Conn.NONE,ws:null,controls:null,granted:false,buffer:{ws:'',mq:'',serial:'',bt:''}};}
-EL(`device#${id}`).className="device";EL(`${ConnNames[conn]}#${id}`).style.display='unset';if(conn<devices_t[id].conn)devices_t[id].conn=conn;break;case'print':if(id!=focused)return;printCLI(device.text,device.color);break;case'update':if(id!=focused)return;if(!(id in devices))return;for(let name in device.updates)applyUpdate(name,device.updates[name]);break;case'ui':if(id!=focused)return;devices_t[id].controls=device.controls;showControls(device.controls,id);break;case'info':if(id!=focused)return;showInfo(device);break;case'push':if(!(id in devices))return;let date=(new Date).getTime();if(date-push_timer<3000)return;push_timer=date;showNotif(device.text,devices[id].name);break;case'fsbr':if(id!=focused)return;showFsbr(device);break;case'fs_error':if(id!=focused)return;EL('fsbr_inner').innerHTML='<div class="fs_err">FS ERROR</div>';break;case'fetch_err':if(id!=focused)return;EL('process#'+fetch_index).innerHTML='Aborted';showPopupError('Fetch aborted');stopFS();break;case'fetch_start':if(id!=focused)return;fetching=focused;fetch_file='';post('fetch_chunk');reset_fetch_tout();break;case'fetch_next_chunk':if(id!=fetching)return;fetch_file+=device.data;if(device.chunk==device.amount-1){EL('download#'+fetch_index).style.display='unset';EL('download#'+fetch_index).href='data:'+getMime(fetch_name)+';base64,'+fetch_file;EL('download#'+fetch_index).download=fetch_name;EL('open#'+fetch_index).style.display='unset';EL('process#'+fetch_index).style.display='none';stopFS();}else{EL('process#'+fetch_index).innerHTML=Math.round(device.chunk/device.amount*100)+'%';post('fetch_chunk');reset_fetch_tout();}
-break;case'upload_err':showPopupError('Upload aborted');EL('file_upload_btn').innerHTML='Error!';setTimeout(()=>EL('file_upload_btn').innerHTML='Upload',2000);stopFS();break;case'upload_start':if(id!=focused)return;uploading=focused;uploadNextChunk();reset_upload_tout();break;case'upload_next_chunk':if(id!=uploading)return;uploadNextChunk();reset_upload_tout();break;case'upload_end':showPopup('Upload Done!');stopFS();EL('file_upload_btn').innerHTML='Done!';setTimeout(()=>EL('file_upload_btn').innerHTML='Upload',2000);post('fsbr');break;case'ota_err':showPopupError('Ota aborted');EL('ota_label').innerHTML='Error!';setTimeout(()=>EL('ota_label').innerHTML='',3000);stopFS();break;case'ota_start':if(id!=focused)return;uploading=focused;otaNextChunk();reset_ota_tout();break;case'ota_next_chunk':if(id!=uploading)return;otaNextChunk();reset_ota_tout();break;case'ota_end':showPopup('OTA Done! Reboot');stopFS();EL('ota_label').innerHTML='Done!';setTimeout(()=>EL('ota_label').innerHTML='',3000);break;case'ota_url_ok':showPopup('OTA Done!');break;case'ota_url_err':showPopupError('OTA Error!');break;}}
-function showControls(controls){EL('controls').style.visibility='hidden';EL('controls').innerHTML='';if(!controls)return;gauges={};canvases={};pickers={};joys={};prompts={};confirms={};dup_names=[];wid_row_count=0;btn_row_count=0;wid_row_id=null;btn_row_id=null;for(ctrl of controls){if(devices[focused].show_names&&ctrl.name)ctrl.label=ctrl.name;ctrl.wlabel=ctrl.label?ctrl.label:ctrl.type;ctrl.clabel=(ctrl.label&&ctrl.label!='_no')?ctrl.label:ctrl.type;ctrl.clabel=ctrl.clabel.charAt(0).toUpperCase()+ctrl.clabel.slice(1);switch(ctrl.type){case'button':addButton(ctrl);break;case'button_i':addButtonIcon(ctrl);break;case'spacer':addSpace(ctrl);break;case'tabs':addTabs(ctrl);break;case'title':addTitle(ctrl);break;case'led':addLED(ctrl);break;case'label':addLabel(ctrl);break;case'icon':addIcon(ctrl);break;case'input':addInput(ctrl);break;case'pass':addPass(ctrl);break;case'slider':addSlider(ctrl);break;case'sliderW':addSliderW(ctrl);break;case'switch':addSwitch(ctrl);break;case'switch_i':addSwitchIcon(ctrl);break;case'switch_t':addSwitchText(ctrl);break;case'date':addDate(ctrl);break;case'time':addTime(ctrl);break;case'datetime':addDateTime(ctrl);break;case'select':addSelect(ctrl);break;case'week':addWeek(ctrl);break;case'color':addColor(ctrl);break;case'spinner':addSpinner(ctrl);break;case'display':addDisplay(ctrl);break;case'html':addHTML(ctrl);break;case'flags':addFlags(ctrl);break;case'log':addLog(ctrl);break;case'widget_b':beginWidgets(ctrl);break;case'widget_e':endWidgets();break;case'canvas':addCanvas(ctrl);break;case'gauge':addGauge(ctrl);break;case'image':addImage(ctrl);break;case'stream':addStream(ctrl);break;case'joy':addJoy(ctrl);break;case'js':eval(ctrl.value);break;case'confirm':confirms[ctrl.name]={label:ctrl.label};break;case'prompt':prompts[ctrl.name]={label:ctrl.label,value:ctrl.value};break;case'menu':addMenu(ctrl);}}
+if(!(id in devices_t)){devices_t[id]={conn:Conn.NONE,ws:null,controls:null,granted:false,buffer:{WS:'',MQTT:'',Serial:'',BT:''},port:null,http_cfg:{upd:0,upload:0,download:0,ota:0,path:'/fs/'}};}
+EL(`device#${id}`).className="device";EL(`${ConnNames[conn]}#${id}`).style.display='unset';if(conn<devices_t[id].conn)devices_t[id].conn=conn;break;case'print':if(id!=focused)return;printCLI(device.text,device.color);break;case'update':if(id!=focused)return;if(!(id in devices))return;for(let name in device.updates)applyUpdate(name,device.updates[name]);break;case'ui':if(id!=focused)return;devices_t[id].controls=device.controls;showControls(device.controls,false,conn,devices[focused].ip);break;case'info':if(id!=focused)return;showInfo(device);break;case'push':if(!(id in devices))return;let date=(new Date).getTime();if(date-push_timer<3000)return;push_timer=date;showNotif(device.text,devices[id].name);break;case'fsbr':if(id!=focused)return;showFsbr(device);break;case'fs_error':if(id!=focused)return;EL('fsbr_inner').innerHTML='<div class="fs_err">FS ERROR</div>';break;case'fetch_start':if(id!=focused)return;fetching=focused;fetch_file='';post('fetch_chunk',fetch_path);reset_fetch_tout();break;case'fetch_next_chunk':if(id!=fetching)return;fetch_file+=device.data;if(device.chunk==device.amount-1){if(fetch_to_file)downloadFileEnd(fetch_file);else fetchEnd(fetch_name,fetch_index,fetch_file);}else{let perc=Math.round(device.chunk/device.amount*100);if(fetch_to_file)processFile(perc);else EL('process#'+fetch_index).innerHTML=perc+'%';post('fetch_chunk',fetch_path);reset_fetch_tout();}
+break;case'fetch_err':if(id!=focused)return;if(fetch_to_file)errorFile();else EL('process#'+fetch_index).innerHTML='Aborted';showPopupError('Fetch aborted');stopFS();break;case'upload_err':showPopupError('Upload aborted');setLabelTout('file_upload_btn','Error!','Upload');stopFS();break;case'upload_start':if(id!=focused)return;uploading=focused;uploadNextChunk();reset_upload_tout();break;case'upload_next_chunk':if(id!=uploading)return;uploadNextChunk();reset_upload_tout();break;case'upload_end':showPopup('Upload Done!');stopFS();setLabelTout('file_upload_btn','Done!','Upload');post('fsbr');break;case'ota_err':showPopupError('Ota aborted');setLabelTout('ota_label','ERROR','IDLE');stopFS();break;case'ota_start':if(id!=focused)return;uploading=focused;otaNextChunk();reset_ota_tout();break;case'ota_next_chunk':if(id!=uploading)return;otaNextChunk();reset_ota_tout();break;case'ota_end':showPopup('OTA Done! Reboot');stopFS();setLabelTout('ota_label','DONE','IDLE');break;case'ota_url_ok':showPopup('OTA Done!');break;case'ota_url_err':showPopupError('OTA Error!');break;}}
+function showControls(controls,from_buffer=false,conn=Conn.NONE,ip='unset'){if(delay_tmr)clearTimeout(delay_tmr);delay_tmr=null;EL('controls').style.visibility='hidden';EL('controls').innerHTML='';if(!controls)return;oninp_buffer={};gauges={};canvases={};pickers={};joys={};prompts={};confirms={};dup_names=[];files=[];wid_row_count=0;btn_row_count=0;wid_row_id=null;btn_row_id=null;for(ctrl of controls){if(devices[focused].show_names&&ctrl.name)ctrl.label=ctrl.name;ctrl.wlabel=ctrl.label?ctrl.label:ctrl.type;ctrl.clabel=(ctrl.label&&ctrl.label!='_no')?ctrl.label:ctrl.type;ctrl.clabel=ctrl.clabel.charAt(0).toUpperCase()+ctrl.clabel.slice(1);switch(ctrl.type){case'button':addButton(ctrl);break;case'button_i':addButtonIcon(ctrl);break;case'spacer':addSpace(ctrl);break;case'tabs':addTabs(ctrl);break;case'title':addTitle(ctrl);break;case'led':addLED(ctrl);break;case'label':addLabel(ctrl);break;case'icon':addIcon(ctrl);break;case'input':addInput(ctrl);break;case'pass':addPass(ctrl);break;case'slider':addSlider(ctrl);break;case'sliderW':addSliderW(ctrl);break;case'switch':addSwitch(ctrl);break;case'switch_i':addSwitchIcon(ctrl);break;case'switch_t':addSwitchText(ctrl);break;case'date':addDate(ctrl);break;case'time':addTime(ctrl);break;case'datetime':addDateTime(ctrl);break;case'select':addSelect(ctrl);break;case'week':addWeek(ctrl);break;case'color':addColor(ctrl);break;case'spinner':addSpinner(ctrl);break;case'display':addDisplay(ctrl);break;case'html':addHTML(ctrl);break;case'flags':addFlags(ctrl);break;case'log':addLog(ctrl);break;case'widget_b':beginWidgets(ctrl);break;case'widget_e':endWidgets();break;case'canvas':addCanvas(ctrl);break;case'gauge':addGauge(ctrl);break;case'image':addImage(ctrl);break;case'stream':addStream(ctrl,conn,ip);break;case'joy':addJoy(ctrl);break;case'js':eval(ctrl.value);break;case'confirm':confirms[ctrl.name]={label:ctrl.label};break;case'prompt':prompts[ctrl.name]={label:ctrl.label,value:ctrl.value};break;case'menu':addMenu(ctrl);break;case'table':addTable(ctrl);break;}}
 if(devices[focused].show_names){let labels=document.querySelectorAll(".widget_label");for(let lbl of labels)lbl.classList.add('widget_label_name');}
-resizeChbuttons();moveSliders();scrollDown();resizeSpinners();setTimeout(()=>{if(dup_names.length)showPopupError('Duplicated names: '+dup_names);showCanvases();showGauges();showPickers();showJoys();EL('controls').style.visibility='visible';},10);if(!gauges.length&&!canvases.length&&!pickers.length&&!joys.length)EL('controls').style.visibility='visible';}
-function showInfo(device){EL('info_lib_v').innerHTML=device.info[0];EL('info_firm_v').innerHTML=device.info[1];if(device.info.length==2)return;let count=2;for(let id in info_labels_esp){EL(id).innerHTML=device.info[count];count++;}
-let ver=EL('info_firm_v').innerHTML;if(projects&&ver.split('@')[0]in projects){EL('info_firm_v').onclick=function(){checkUpdates(focused,true);};EL('info_firm_v').classList.add('info_link');}else{EL('info_firm_v').onclick=function(){};EL('info_firm_v').classList.remove('info_link');}}
-let screen='main';let deferredPrompt=null;let pin_id=null;let started=false;let show_version=false;let cfg_changed=false;let projects=null;let menu_f=false;let cfg={prefix:'MyDevices',use_ws:false,use_hook:true,client_ip:'192.168.1.1',netmask:24,use_bt:false,use_serial:false,use_mqtt:false,mq_host:'test.mosquitto.org',mq_port:'8081',mq_login:'',mq_pass:'',use_pin:false,hub_pin:'',hub_id:new Date().getTime().toString().hashCode().toString(16),ui_width:450,theme:'DARK',maincolor:'GREEN',font:'monospace',version:app_version,check_upd:true};document.addEventListener('keydown',function(e){if(!started)return;switch(e.keyCode){case 116:if(!e.ctrlKey){e.preventDefault();refresh_h();}
+resizeFlags();moveSliders();scrollDown();resizeSpinners();delay_tmr=setTimeout(()=>{if(dup_names.length)showPopupError('Duplicated names: '+dup_names);showCanvases();showGauges();showPickers();showJoys();if(!from_buffer)nextFile();EL('controls').style.visibility='visible';delay_tmr=null;},10);if(!gauges.length&&!canvases.length&&!pickers.length&&!joys.length)EL('controls').style.visibility='visible';}
+function showInfo(device){function addInfo(el,label,value,title=''){EL(el).innerHTML+=`
+<div class="cfg_row info">
+<label>${label}</label>
+<label title="${title}" class="lbl_info">${value}</label>
+</div>`;}
+EL('info_version').innerHTML='';EL('info_net').innerHTML='';EL('info_memory').innerHTML='';EL('info_system').innerHTML='';for(let i in device.info.version)addInfo('info_version',i,device.info.version[i]);for(let i in device.info.net)addInfo('info_net',i,device.info.net[i]);for(let i in device.info.memory){if(typeof(device.info.memory[i])=='object'){let used=device.info.memory[i][0];let total=device.info.memory[i][1];let mem=(used/1000).toFixed(1)+' kB';if(total)mem+=' ['+(used/total*100).toFixed(0)+'%]';addInfo('info_memory',i,mem,`Total ${(total / 1000).toFixed(1)} kB`);}else addInfo('info_memory',i,device.info.memory[i]);}
+for(let i in device.info.system){if(i=='Uptime'){let sec=device.info.system[i];let upt=Math.floor(sec/86400)+':'+new Date(sec*1000).toISOString().slice(11,19);let d=new Date();let utc=d.getTime()-(d.getTimezoneOffset()*60000);addInfo('info_system',i,upt);addInfo('info_system','Started',new Date(utc-sec*1000).toISOString().split('.')[0].replace('T',' '));continue;}
+addInfo('info_system',i,device.info.system[i]);}}
+function setLabelTout(el,text1,text2){EL(el).innerHTML=text1;setTimeout(()=>EL(el).innerHTML=text2,3000);}
+let screen='main';let deferredPrompt=null;let pin_id=null;let show_version=false;let cfg_changed=false;let menu_f=false;let updates=[];let cfg={use_pin:false,pin:'',ui_width:450,theme:'DARK',maincolor:'GREEN',font:'monospace',version:app_version,check_upd:true,};window.onload=function(){render_main(app_version);EL('title').innerHTML=app_title;let title='GyverHub v'+app_version+' ['+hub.cfg.client_id+'] '+(isPWA()?'PWA ':'')+(isSSL()?'SSL ':'')+(isLocal()?'Local ':'')+(isESP()?'ESP ':'')+(isApp()?'App ':'');EL('title').title=title;load_cfg();load_hcfg();if(isESP())hub.cfg.use_ws=true;update_ip();update_theme();set_drop();key_change();handle_back();register_SW();if(cfg.use_pin)show_keypad(true);else startup();}
+function startup(){render_selects();render_info();apply_cfg();update_theme();show_screen('main');load_devices();render_devices();discover();if('Notification'in window&&Notification.permission=='default')Notification.requestPermission();if(isSSL()){EL('http_only_http').style.display='block';EL('http_settings').style.display='none';EL('pwa_unsafe').style.display='none';}
+if(isPWA()||isLocal()||isApp()){EL('pwa_block').style.display='none';}
+if(isApp())EL('app_block').style.display='none';serial_change();if(hub.cfg.use_mqtt)mq_start();setInterval(()=>{if(hub.cfg.use_mqtt&&!mq_state()){log('MQTT reconnect');mq_start();}},5000);setTimeout(()=>{if(show_version)alert('Версия '+app_version+'!\n'+'Many minor fixes');},1000);}
+function register_SW(){if('serviceWorker'in navigator&&!isLocal()&&!isApp()){navigator.serviceWorker.register('/sw.js');window.addEventListener('beforeinstallprompt',(e)=>deferredPrompt=e);}}
+function set_drop(){function preventDrop(e){e.preventDefault()
+e.stopPropagation()}
+['dragenter','dragover','dragleave','drop'].forEach(e=>{document.body.addEventListener(e,preventDrop,false);});['dragenter','dragover'].forEach(e=>{document.body.addEventListener(e,function(){document.querySelectorAll('.drop_area').forEach((el)=>{el.classList.add('active');});},false);});['dragleave','drop'].forEach(e=>{document.body.addEventListener(e,function(){document.querySelectorAll('.drop_area').forEach((el)=>{el.classList.remove('active');});},false);});}
+function key_change(){document.addEventListener('keydown',function(e){switch(e.keyCode){case 116:if(!e.ctrlKey){e.preventDefault();refresh_h();}
 break;case 192:if(focused){e.preventDefault();toggleCLI();}
-break;default:break;}});window.onload=function(){if('serviceWorker'in navigator&&!isLocal()&&!isApp()){navigator.serviceWorker.register('/sw.js');window.addEventListener('beforeinstallprompt',(e)=>deferredPrompt=e);}
-window.history.pushState({page:1},"","");window.onpopstate=function(e){window.history.pushState({page:1},"","");back_h();}
-render_main(app_version);EL('title').innerHTML=app_title;load_cfg();if(typeof cfg.hub_id!='string')cfg.hub_id=cfg.hub_id.toString(16);let title='GyverHub v'+app_version+' ['+cfg.hub_id+'] '+(isPWA()?'PWA ':'')+(isSSL()?'SSL ':'')+(isLocal()?'Local ':'')+(isESP()?'ESP ':'')+(isApp()?'App ':'');EL('title').title=title;log(title);if(cfg.use_pin)show_keypad(true);else startup();started=true;}
-function startup(){if(isESP())cfg.use_ws=true;render_selects();render_info();show_screen('main');apply_cfg();update_ip();load_devices();render_devices();discover();if(isSSL()){EL('http_only_http').style.display='block';EL('http_settings').style.display='none';EL('pwa_unsafe').style.display='none';}
-if(isPWA()||isLocal()||isApp()){EL('app_block').style.display='none';}
-if(cfg.use_mqtt)mq_start();setInterval(()=>{if(cfg.use_mqtt&&!mq_state()){log('MQTT reconnect');mq_start();}},5000);setTimeout(()=>{if(show_version)alert('Версия '+app_version+'!\n'+version_notes);},1000);if(cfg.check_upd)fetchProjects();}
-function checkUpdates(id,force=false){return false;}
+break;default:break;}});}
+function handle_back(){window.history.pushState({page:1},"","");window.onpopstate=function(e){window.history.pushState({page:1},"","");back_h();}}
+function update_ip(){if(!Boolean(window.webkitRTCPeerConnection||window.mozRTCPeerConnection))return;getLocalIP().then((ip)=>{if(ip.indexOf("local")<0){EL('local_ip').value=ip;hub.cfg.local_ip=ip;}});if(isESP()){EL('local_ip').value=window_ip();hub.cfg.local_ip=window_ip();}}
+async function checkUpdates(id){if(!cfg.check_upd)return;if(updates.includes(id))return;let ver=devices[id].version;if(!ver.includes('@'))return;let namever=ver.split('@');const resp=await fetch(`https://raw.githubusercontent.com/${namever[0]}/master/project.json`,{cache:"no-store"});let proj=await resp.text();try{proj=JSON.parse(proj);}catch(e){return;}
+if(proj.version==namever[1])return;if(id!=focused)return;updates.push(id);if(confirm('Available new version v'+proj.version+' for device ['+namever[0]+']. Notes:\n'+proj.notes+'\n\nUpdate firmware?')){if('ota_url'in proj)otaUrl(proj.ota_url,'flash');else otaUrl(`https://raw.githubusercontent.com/${namever[0]}/master/bin/firmware.bin${devices[id].ota_t == 'bin' ? '' : ('.' + devices[id].ota_t)}`,'flash');}}
 async function pwa_install(ssl){if(ssl&&!isSSL()){if(confirm("Redirect to HTTPS?"))window.location.href=window.location.href.replace('http:','https:');else return;}
 if(!ssl&&isSSL()){if(confirm("Redirect to HTTP"))window.location.href=window.location.href.replace('https:','http:');else return;}
 if(!('serviceWorker'in navigator)){alert('Error');return;}
 if(deferredPrompt!==null){deferredPrompt.prompt();const{outcome}=await deferredPrompt.userChoice;if(outcome==='accepted')deferredPrompt=null;}}
-async function fetchProjects(){try{const response=await fetch("https://raw.githubusercontent.com/GyverLibs/GyverHub-projects/main/projects.txt",{cache:"no-store"});projects=await response.text();}catch(e){return;}}
 async function loadProjects(){const resp=await fetch("https://raw.githubusercontent.com/GyverLibs/GyverHub-projects/main/projects.txt",{cache:"no-store"});let projects=await resp.text();projects=projects.split('\n');for(let proj of projects){if(!proj)continue;let rep=proj.split('https://github.com/')[1];if(!rep)continue;loadProj(rep);}}
-async function loadProj(rep){const resp=await fetch(`https://raw.githubusercontent.com/${rep}/master/project.json`,{cache:"no-store"});let proj=await resp.text();if(proj=='404: Not Found')return;try{proj=JSON.parse(proj);}catch(e){return;}
-if(!('version'in proj)||!('notes'in proj)||!('about'in proj))return;EL('projects').innerHTML+=`
+async function loadProj(rep){const resp=await fetch(`https://raw.githubusercontent.com/${rep}/master/project.json`,{cache:"no-store"});let proj=await resp.text();try{proj=JSON.parse(proj);}catch(e){return;}
+if(!('version'in proj)||!('notes'in proj)||!('about'in proj))return;let name=rep.split('/')[1];if(name.length>30)name=name.slice(0,30)+'..';EL('projects').innerHTML+=`
 <div class="proj">
 <div class="proj_inn">
 <div class="proj_name">
-<a href="${'https://github.com/' + rep}" target="_blank" title="Open repository">${rep}</a>
-<a href="https://raw.githubusercontent.com/${rep}/master/bin/firmware.bin" target="_blank" title="Download .bin\n${proj.notes}">v${proj.version}</a></div>
+<a href="${'https://github.com/' + rep}" target="_blank" title="${rep} v${proj.version}">${name}</a>
 <div class="proj_about">${proj.about}</div>
 </div>
 </div>
 `;}
-function pass_type(v){pass_inp.value+=v;let hash=pass_inp.value.hashCode();if(pin_id){if(hash==devices[pin_id].PIN){open_device(pin_id);pass_inp.value='';devices_t[pin_id].granted=true;}}else{if(hash==cfg.hub_pin){EL('password').style.display='none';startup();pass_inp.value='';}}}
+function pass_type(v){pass_inp.value+=v;let hash=pass_inp.value.hashCode();if(pin_id){if(hash==devices[pin_id].PIN){open_device(pin_id);pass_inp.value='';devices_t[pin_id].granted=true;}}else{if(hash==cfg.pin){EL('password').style.display='none';startup();pass_inp.value='';}}}
 function check_type(arg){if(arg.value.length>0){let c=arg.value[arg.value.length-1];if(c<'0'||c>'9')arg.value=arg.value.slice(0,-1);}}
 function show_keypad(v){if(v){EL('password').style.display='block';EL('pass_inp').focus();}else{EL('password').style.display='none';}}
 function render_devices(){EL('devices').innerHTML='';for(let id in devices)addDevice(id);}
-function render_info(){for(let id in info_labels_topics){EL('info_topics').innerHTML+=`
+function render_info(){const info_labels_topics={info_id:'ID',info_set:'Set',info_read:'Read',info_get:'Get',info_status:'Status',};for(let id in info_labels_topics){EL('info_topics').innerHTML+=`
 <div class="cfg_row info">
 <label>${info_labels_topics[id]}</label>
 <label id="${id}" class="lbl_info info_small">-</label>
-</div>`;}
-for(let id in info_labels_version){EL('info_version').innerHTML+=`
-<div class="cfg_row info">
-<label>${info_labels_version[id]}</label>
-<label id="${id}" class="lbl_info">-</label>
-</div>`;}
-for(let id in info_labels_esp){EL('info_esp').innerHTML+=`
-<div class="cfg_row info">
-<label>${info_labels_esp[id]}</label>
-<label id="${id}" class="lbl_info">-</label>
-</div>`;}
-EL('info_esp').innerHTML+='<div style="padding:10px"><button class="c_btn btn_mini" onclick="reboot_h()"><span class="icon info_icon"></span>Reboot</button></div>';EL('info_l_ip').onclick=function(){window.open('http://'+devices[focused].ip,'_blank').focus();};EL('info_l_ip').classList.add('info_link');}
-function update_info(){let id=focused;EL('info_break_sw').checked=devices[id].break_widgets;EL('info_names_sw').checked=devices[id].show_names;EL('info_cli_sw').checked=EL('cli_cont').style.display=='block';EL('info_id').innerHTML=id;EL('info_set').innerHTML=devices[id].prefix+'/'+id+'/set/*';EL('info_read').innerHTML=devices[id].prefix+'/'+id+'/read/*';EL('info_get').innerHTML=devices[id].prefix+'/hub/'+id+'/get/*';EL('info_status').innerHTML=devices[id].prefix+'/hub/'+id+'/status';}
-function render_selects(){for(let color in colors){EL('maincolor').innerHTML+=`
+</div>`;}}
+function update_info(){let id=focused;EL('info_break_sw').checked=devices[id].break_widgets;EL('info_names_sw').checked=devices[id].show_names;EL('info_cli_sw').checked=EL('cli_cont').style.display=='block';EL('info_id').innerHTML=id;EL('info_set').innerHTML=devices[id].prefix+'/'+id+'/set/*';EL('info_read').innerHTML=devices[id].prefix+'/'+id+'/read/*';EL('info_get').innerHTML=devices[id].prefix+'/hub/'+id+'/get/*';EL('info_status').innerHTML=devices[id].prefix+'/hub/'+id+'/status';EL('reboot_btn').style.display=readModule(Modules.REBOOT)?'block':'none';EL('info_version').innerHTML='';EL('info_net').innerHTML='';EL('info_memory').innerHTML='';EL('info_system').innerHTML='';}
+function render_selects(){for(let baud of baudrates){EL('baudrate').innerHTML+=`
+<option value="${baud}">${baud}</option>`;}
+for(let color in colors){EL('maincolor').innerHTML+=`
 <option value="${color}">${color}</option>`;}
 for(let font of fonts){EL('font').innerHTML+=`
 <option value="${font}">${font}</option>`;}
 for(let theme in themes){EL('theme').innerHTML+=`
 <option value="${theme}">${theme}</option>`;}
-for(let i=0;i<33;i++){let imask;if(i==32)imask=0xffffffff;else imask=~(0xffffffff>>>i);EL('netmask').innerHTML+=`
-<option value="${i}">${intToOctets(imask)}</option>`;}}
+let masks=getMaskList();for(let mask in masks){EL('netmask').innerHTML+=`<option value="${mask}">${masks[mask]}</option>`;}}
 function test_h(){show_screen('test');}
 function projects_h(){EL('projects').innerHTML='';show_screen('projects');loadProjects();}
 function refresh_h(){if(screen=='device')post('focus');else if(screen=='info')post('info');else if(screen=='fsbr')post('fsbr');else discover();}
-function back_h(){if(menu_f){menu_deact();menu_show(0);return;}
-switch(screen){case'device':release_all();close_device();break;case'info':show_screen('device');break;case'fsbr':show_screen('device');break;case'config':config_h();break;case'pin':case'projects':case'test':show_screen('main');break;}}
+function back_h(){if(EL('fsbr_edit').style.display=='block'){editor_cancel();return;}
+stopFS();if(menu_f){menuDeact();menu_show(0);return;}
+switch(screen){case'device':release_all();close_device();break;case'info':case'fsbr':menuDeact();showControls(devices_t[focused].controls);show_screen('device');break;case'config':config_h();break;case'pin':case'projects':case'test':show_screen('main');break;}}
 function config_h(){if(screen=='config'){if(cfg_changed)save_cfg();cfg_changed=false;show_screen('main');discover();}else{show_screen('config');}}
 function menu_show(state){menu_f=state;let cl=EL('menu').classList;if(menu_f)cl.add('menu_show');else cl.remove('menu_show');EL('icon_menu').innerHTML=menu_f?'':'';EL('menu_overlay').style.display=menu_f?'block':'none';}
 function menu_h(){menu_show(!menu_f);}
-function info_h(){menu_deact();menu_show(0);post('info');show_screen('info');EL('menu_info').classList.add('menu_act');}
-function fsbr_h(){menu_deact();menu_show(0);post('fsbr');EL('fsbr_inner').innerHTML='<div class="fsbr_wait"><span style="font-size:50px;color:var(--prim)" class="icon spinning"></span></div>';show_screen('fsbr');EL('menu_fsbr').classList.add('menu_act');}
-function device_h(id){if(discovering)return;if(!(id in devices_t)||devices_t[id].conn==Conn.NONE){delete_h(id);return;}
+function info_h(){stopFS();menuDeact();menu_show(0);if(readModule(Modules.INFO))post('info');show_screen('info');EL('menu_info').classList.add('menu_act');}
+function fsbr_h(){menuDeact();menu_show(0);if(readModule(Modules.FSBR)){post('fsbr');EL('fsbr_inner').innerHTML=waiter;}
+EL('fs_browser').style.display=readModule(Modules.FSBR)?'block':'none';EL('fs_upload').style.display=readModule(Modules.UPLOAD)?'block':'none';EL('fs_otaf').style.display=readModule(Modules.OTA)?'block':'none';EL('fs_otaurl').style.display=readModule(Modules.OTA_URL)?'block':'none';EL('fs_format').style.display=readModule(Modules.FORMAT)?'inline-block':'none';EL('fs_update').style.display=readModule(Modules.FSBR)?'inline-block':'none';show_screen('fsbr');EL('menu_fsbr').classList.add('menu_act');}
+function device_h(id){if(discovering)return;if(!(id in devices_t)||devices_t[id].conn==Conn.NONE){return;}
 if(!devices[id])return;if(devices[id].PIN&&!devices_t[id].granted){pin_id=id;show_screen('pin');}else open_device(id);}
-function open_device(id){if(checkUpdates(id))return;focused=id;switch(devices_t[id].conn){case Conn.SERIAL:break;case Conn.BT:break;case Conn.WS:refreshSpin(true);ws_start(id);ws_focus_flag=true;break;case Conn.MQTT:post('focus');break;}
-log('Open device #'+id+' via '+ConnNames[devices_t[id].conn]);EL('menu_user').innerHTML='';showControls(devices_t[id].controls);show_screen('device');reset_ping();}
-function close_device(){showErr(false);switch(devices_t[focused].conn){case Conn.SERIAL:break;case Conn.BT:break;case Conn.WS:ws_stop(focused);refreshSpin(false);break;case Conn.MQTT:post('unfocus');break;}
+function open_device(id){checkUpdates(id);focused=id;switch(devices_t[id].conn){case Conn.SERIAL:post('focus');break;case Conn.BT:post('focus');break;case Conn.WS:refreshSpin(true);ws_start(id);ws_focus_flag=true;break;case Conn.MQTT:post('focus');break;}
+log('Open device #'+id+' via '+ConnNames[devices_t[id].conn]);EL('menu_user').innerHTML='';showControls(devices_t[id].controls,true);show_screen('device');reset_ping();}
+function close_device(){showErr(false);switch(devices_t[focused].conn){case Conn.SERIAL:post('unfocus');break;case Conn.BT:post('unfocus');break;case Conn.WS:ws_stop(focused);refreshSpin(false);break;case Conn.MQTT:post('unfocus');break;}
 log('Close device #'+focused);focused=null;show_screen('main');stop_ping();stop_tout();}
 function clear_all(){EL('devices').innerHTML="";devices={};devices_t={};save_devices();show_screen('main');}
-function show_screen(nscreen){screen=nscreen;stopFS();show_keypad(false);let proj_s=EL('projects_cont').style;let test_s=EL('test_cont').style;let main_s=EL('main_cont').style;let config_s=EL('config').style;let devices_s=EL('devices').style;let controls_s=EL('controls').style;let info_s=EL('info').style;let fsbr_s=EL('fsbr').style;let icon_cfg_s=EL('icon_cfg').style;let icon_menu_s=EL('icon_menu').style;let icon_refresh_s=EL('icon_refresh').style;let back_s=EL('back').style;let version_s=EL('version').style;let title_row_s=EL('title_row').style;main_s.display='block';test_s.display='none';proj_s.display='none';config_s.display='none';devices_s.display='none';controls_s.display='none';info_s.display='none';icon_menu_s.display='none';icon_cfg_s.display='none';fsbr_s.display='none';back_s.display='none';icon_refresh_s.display='none';version_s.display='none';title_row_s.cursor='pointer';EL('title').innerHTML=app_title;if(screen=='main'){version_s.display='unset';devices_s.display='grid';icon_cfg_s.display='inline-block';icon_refresh_s.display='inline-block';title_row_s.cursor='unset';EL('conn').innerHTML='';showCLI(false);}else if(screen=='test'){main_s.display='none';test_s.display='block';back_s.display='inline-block';EL('title').innerHTML='UI Test';}else if(screen=='projects'){main_s.display='none';proj_s.display='block';back_s.display='inline-block';EL('title').innerHTML='Projects';}else if(screen=='device'){controls_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';icon_refresh_s.display='inline-block';EL('title').innerHTML=devices[focused].name;}else if(screen=='config'){config_s.display='block';icon_cfg_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML='Config';}else if(screen=='info'){info_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/info';update_info();}else if(screen=='fsbr'){fsbr_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/fs';}else if(screen=='pin'){back_s.display='inline-block';show_keypad(true);}}
+function show_screen(nscreen){stopFS();screen=nscreen;show_keypad(false);let footer_s=EL('footer_cont').style;let conns_s=EL('conn_icons').style;let proj_s=EL('projects_cont').style;let test_s=EL('test_cont').style;let main_s=EL('main_cont').style;let config_s=EL('config').style;let devices_s=EL('devices').style;let controls_s=EL('controls').style;let info_s=EL('info').style;let fsbr_s=EL('fsbr').style;let icon_cfg_s=EL('icon_cfg').style;let icon_menu_s=EL('icon_menu').style;let icon_refresh_s=EL('icon_refresh').style;let back_s=EL('back').style;let version_s=EL('version').style;let title_row_s=EL('title_row').style;conns_s.display='none';main_s.display='block';test_s.display='none';proj_s.display='none';config_s.display='none';devices_s.display='none';controls_s.display='none';info_s.display='none';icon_menu_s.display='none';icon_cfg_s.display='none';fsbr_s.display='none';back_s.display='none';icon_refresh_s.display='none';version_s.display='none';title_row_s.cursor='pointer';footer_s.display='none';EL('title').innerHTML=app_title;if(screen=='main'){conns_s.display='flex';version_s.display='unset';devices_s.display='grid';icon_cfg_s.display='inline-block';icon_refresh_s.display='inline-block';title_row_s.cursor='unset';footer_s.display='block';EL('conn').innerHTML='';showCLI(false);}else if(screen=='test'){main_s.display='none';test_s.display='block';back_s.display='inline-block';EL('title').innerHTML='UI Test';}else if(screen=='projects'){main_s.display='none';proj_s.display='block';back_s.display='inline-block';EL('title').innerHTML='Projects';}else if(screen=='device'){controls_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';icon_refresh_s.display='inline-block';EL('title').innerHTML=devices[focused].name;}else if(screen=='config'){conns_s.display='flex';config_s.display='block';icon_cfg_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML='Config';}else if(screen=='info'){info_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/info';update_info();}else if(screen=='fsbr'){fsbr_s.display='block';icon_menu_s.display='inline-block';back_s.display='inline-block';EL('title').innerHTML=devices[focused].name+'/fs';}else if(screen=='pin'){back_s.display='inline-block';show_keypad(true);}}
 function delete_h(id){if(confirm('Delete '+id+'?')){document.getElementById("device#"+id).remove();delete devices[id];save_devices();return 1;}
 return 0;}
 function printCLI(text,color){if(EL('cli_cont').style.display=='block'){if(EL('cli').innerHTML)EL('cli').innerHTML+='\n';let st=color?`style="color:${intToCol(color)}"`:'';EL('cli').innerHTML+=`><span ${st}">${text}</span>`;EL('cli').scrollTop=EL('cli').scrollHeight;}}
 function toggleCLI(){EL('cli').innerHTML="";EL('cli_input').value="";showCLI(!(EL('cli_cont').style.display=='block'));}
-function showCLI(v){EL('bottom_space').style.height=v?'170px':'70px';EL('cli_cont').style.display=v?'block':'none';if(v)EL('cli_input').focus();EL('info_cli_sw').checked=v;}
+function showCLI(v){EL('bottom_space').style.height=v?'170px':'50px';EL('cli_cont').style.display=v?'block':'none';if(v)EL('cli_input').focus();EL('info_cli_sw').checked=v;}
 function checkCLI(){if(event.key=='Enter')sendCLI();}
 function sendCLI(){post('cli','cli',EL('cli_input').value);EL('cli_input').value="";}
-function sendDiscover(){if(cfg.use_mqtt)mq_discover();if(cfg.use_ws&&!isSSL())ws_discover();}
+function sendDiscover(){if(hub.cfg.use_mqtt)mq_discover();if(hub.cfg.use_serial)serial_discover();if(hub.cfg.use_bt)bt_discover();if(hub.cfg.use_ws&&!isSSL())ws_discover();}
 function discover(){if(isESP()){let has=false;for(let id in devices){if(window.location.href.includes(devices[id].ip))has=true;}
 if(!has&&checkIP(window_ip()))ws_discover_ip(window_ip());}
 for(let id in devices){if(id in devices_t)devices_t[id].conn=Conn.NONE;EL(`device#${id}`).className="device offline";EL(`Serial#${id}`).style.display='none';EL(`BT#${id}`).style.display='none';EL(`WS#${id}`).style.display='none';EL(`MQTT#${id}`).style.display='none';}
 sendDiscover();}
-function discover_all(){if(cfg.use_mqtt)mq_discover_all();if(cfg.use_ws&&!isSSL())ws_discover_all();back_h();}
-function mq_change(start=false){mq_show_err(1);mq_stop();if(start)mq_start();}
-function update_cfg(el){cfg_changed=true;if(el.type=='text')el.value=el.value.trim();if(el.type=='checkbox')cfg[el.id]=el.checked;else cfg[el.id]=el.value;updateTheme();}
-function save_cfg(){localStorage.setItem('config',JSON.stringify(cfg));}
-function load_cfg(){if(localStorage.hasOwnProperty('config')){let cfg_r=JSON.parse(localStorage.getItem('config'));let dif=false;for(let key in cfg){if(cfg_r[key]===undefined){cfg_r[key]=cfg[key];dif=true;}}
-if(cfg_r['version']!=cfg['version']){cfg_r['version']=cfg['version'];dif=true;show_version=true;}
-cfg=cfg_r;if(dif)save_cfg();}else{if('Notification'in window&&Notification.permission=='default')Notification.requestPermission();}
-updateTheme();}
+function discover_all(){if(hub.cfg.use_mqtt)mq_discover_all();if(hub.cfg.use_serial)serial_discover();if(hub.cfg.use_bt)bt_discover();if(hub.cfg.use_ws&&!isSSL())ws_discover_all();back_h();}
+function update_cfg(el){if(el.type=='text')el.value=el.value.trim();let val=(el.type=='checkbox')?el.checked:el.value;if(el.id in cfg)cfg[el.id]=val;else if(el.id in hub.cfg)hub.cfg[el.id]=val;cfg_changed=true;update_theme();}
+function save_cfg(){localStorage.setItem('config',JSON.stringify(cfg));localStorage.setItem('hub_config',JSON.stringify(hub.cfg));}
+function load_cfg(){if(localStorage.hasOwnProperty('config')){let cfg_r=JSON.parse(localStorage.getItem('config'));if(cfg_r.version!=cfg.version){cfg_r.version=cfg.version;show_version=true;}
+if(Object.keys(cfg).length==Object.keys(cfg_r).length){cfg=cfg_r;if(!show_version)return;}}
+localStorage.setItem('config',JSON.stringify(cfg));}
+function load_hcfg(){if(localStorage.hasOwnProperty('hub_config')){let cfg_r=JSON.parse(localStorage.getItem('hub_config'));if(Object.keys(hub.cfg).length==Object.keys(cfg_r).length){hub.cfg=cfg_r;return;}}
+localStorage.setItem('hub_config',JSON.stringify(hub.cfg));}
 function apply_cfg(){for(let key in cfg){if(key=='version')continue;let el=EL(key);if(el==undefined)continue;if(el.type=='checkbox')el.checked=cfg[key];else el.value=cfg[key];}
-updateTheme();}
-async function cfg_export(){try{const text=btoa(JSON.stringify(cfg))+','+btoa(encodeURIComponent(JSON.stringify(devices)));await navigator.clipboard.writeText(text);showPopup('Copied to clipboard');}catch(err){showPopupError('Export error');}}
-async function cfg_import(){try{let text=await navigator.clipboard.readText();try{cfg=JSON.parse(atob(text.split(',')[0]));}catch(e){}
-apply_cfg();save_cfg();try{devices=JSON.parse(decodeURIComponent(atob(text.split(',')[1])));}catch(e){}
-render_devices();save_devices();showPopup('Import done');}catch(e){showPopupError('Wrong data');}}
-function updateTheme(){let v=themes[cfg.theme];let r=document.querySelector(':root');r.style.setProperty('--back',theme_cols[v][0]);r.style.setProperty('--tab',theme_cols[v][1]);r.style.setProperty('--font',theme_cols[v][2]);r.style.setProperty('--font2',theme_cols[v][3]);r.style.setProperty('--dark',theme_cols[v][4]);r.style.setProperty('--thumb',theme_cols[v][5]);r.style.setProperty('--black',theme_cols[v][6]);r.style.setProperty('--scheme',theme_cols[v][7]);r.style.setProperty('--font_inv',theme_cols[v][8]);r.style.setProperty('--shad',theme_cols[v][9]);r.style.setProperty('--ui_width',cfg.ui_width+'px');r.style.setProperty('--prim',intToCol(colors[cfg.maincolor]));r.style.setProperty('--font_f',cfg.font);let b='block';let n='none';let f='var(--font)';let f3='var(--font3)';EL('ws_block').style.display=cfg.use_ws?b:n;EL('ws_label').style.color=cfg.use_ws?f:f3;EL('pin_block').style.display=cfg.use_pin?b:n;EL('pin_label').style.color=cfg.use_pin?f:f3;EL('mq_block').style.display=cfg.use_mqtt?b:n;EL('mqtt_label').style.color=cfg.use_mqtt?f:f3;EL('bt_block').style.display=cfg.use_bt?b:n;EL('bt_label').style.color=cfg.use_bt?f:f3;EL('serial_block').style.display=cfg.use_serial?b:n;EL('serial_label').style.color=cfg.use_serial?f:f3;}
+for(let key in hub.cfg){let el=EL(key);if(el==undefined)continue;if(el.type=='checkbox')el.checked=hub.cfg[key];else el.value=hub.cfg[key];}}
+async function cfg_export(){try{const text=btoa(JSON.stringify(cfg))+';'+btoa(JSON.stringify(hub.cfg))+';'+btoa(encodeURIComponent(JSON.stringify(devices)));await navigator.clipboard.writeText(text);showPopup('Copied to clipboard');}catch(e){showPopupError('Export error');}}
+async function cfg_import(){try{let text=await navigator.clipboard.readText();text=text.split(';');try{cfg=JSON.parse(atob(text[0]));}catch(e){}
+try{hub.cfg=JSON.parse(atob(text[1]));}catch(e){}
+try{devices=JSON.parse(decodeURIComponent(atob(text[2])));}catch(e){}
+save_cfg();save_devices();showPopup('Import done');setTimeout(()=>location.reload(),1500);}catch(e){showPopupError('Wrong data');}}
+function update_theme(){let v=themes[cfg.theme];let r=document.querySelector(':root');r.style.setProperty('--back',theme_cols[v][0]);r.style.setProperty('--tab',theme_cols[v][1]);r.style.setProperty('--font',theme_cols[v][2]);r.style.setProperty('--font2',theme_cols[v][3]);r.style.setProperty('--dark',theme_cols[v][4]);r.style.setProperty('--thumb',theme_cols[v][5]);r.style.setProperty('--black',theme_cols[v][6]);r.style.setProperty('--scheme',theme_cols[v][7]);r.style.setProperty('--font_inv',theme_cols[v][8]);r.style.setProperty('--shad',theme_cols[v][9]);r.style.setProperty('--ui_width',cfg.ui_width+'px');r.style.setProperty('--prim',intToCol(colors[cfg.maincolor]));r.style.setProperty('--font_f',cfg.font);let b='block';let n='none';let f='var(--font)';let f3='var(--font3)';EL('ws_block').style.display=hub.cfg.use_ws?b:n;EL('ws_label').style.color=hub.cfg.use_ws?f:f3;EL('pin_block').style.display=cfg.use_pin?b:n;EL('pin_label').style.color=cfg.use_pin?f:f3;EL('mq_block').style.display=hub.cfg.use_mqtt?b:n;EL('mqtt_label').style.color=hub.cfg.use_mqtt?f:f3;EL('bt_block').style.display=hub.cfg.use_bt?b:n;EL('bt_label').style.color=hub.cfg.use_bt?f:f3;EL('serial_block').style.display=hub.cfg.use_serial?b:n;EL('serial_label').style.color=hub.cfg.use_serial?f:f3;}
 (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 "use strict";window.sortPaths=require("./sort-paths.js");
 },{"./sort-paths.js":3}],2:[function(require,module,exports){

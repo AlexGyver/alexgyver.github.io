@@ -24,6 +24,8 @@ function traceWaves() {
       phase += val / 255;
       y += sin(phase) * size / 2 * val / 255 * A;
       lineOffs(cr_px, cr_py, x, y);
+      //stroke(255-val)
+      //lineOffs(x, row*size, x, (row+1)*size);
       cr_px = x;
       cr_py = y;
       coords += x + ',' + Math.round(y) + '\n';
@@ -121,6 +123,7 @@ function traceCrawl() {
       stop();
       break;
     }
+
     if (++loops > 500 * cr_skip) break;
   }
 }

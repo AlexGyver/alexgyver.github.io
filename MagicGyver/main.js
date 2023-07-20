@@ -9,29 +9,6 @@ function setup() {
   createCanvas(cv_offs + cv_w + 10, cv_h * 2 + ui_padd * 2 + 10);
   imageMode(CENTER);
   ellipseMode(CENTER);
-
-  /*loadImage('ag.jpg', img => {
-    handleImage(img);
-  });*/
-
-  /*let size = 3;
-  function pointOffs2(x, y) {
-    strokeWeight(5)
-    stroke(0,0,0,100)
-    pointOffs(x*10+50, y*10);
-  }
-  for (let x = tx - size; x < tx + size; x++) {
-     pointOffs2(x, ty - size);
-  }
-  for (let y = ty - size; y < ty + size; y++) {
-     pointOffs2(tx + size, y);
-  }
-  for (let x = tx + size; x > tx - size; x--) {
-     pointOffs2(x, ty + size);
-  }
-  for (let y = ty + size; y > ty - size; y--) {
-     pointOffs2(tx - size, y)
-  }*/
 }
 
 // =============== MAIN LOOP ===============

@@ -1,8 +1,8 @@
 // =============== VARS ===============
 const cv_offs = 280;
 const ui_padd = 20;
-let cv_w = 590;
-let cv_h = 440;
+let map_w = 590;
+let map_h = 440;
 
 let ui;
 let update_f = true, hold_f = false, run_f = false;
@@ -40,24 +40,24 @@ class Offset {
 
 // =============== CV OFFSET ===============
 function pointOffs(x, y) {
-  point(cv_offs + x, cv_h + ui_padd * 2 + y);
+  point(cv_offs + x, map_h + ui_padd * 2 + y);
 }
 function lineOffs(x0, y0, x1, y1) {
-  line(cv_offs + x0, cv_h + ui_padd * 2 + y0, cv_offs + x1, cv_h + ui_padd * 2 + y1);
+  line(cv_offs + x0, map_h + ui_padd * 2 + y0, cv_offs + x1, map_h + ui_padd * 2 + y1);
 }
 
 // =============== UI ===============
 function ui_init() {
-  if (localStorage.hasOwnProperty('cv_w')) cv_w = Number(localStorage.getItem('cv_w'));
-  if (localStorage.hasOwnProperty('cv_h')) cv_h = Number(localStorage.getItem('cv_h'));
+  if (localStorage.hasOwnProperty('map_w')) map_w = Number(localStorage.getItem('map_w'));
+  if (localStorage.hasOwnProperty('map_h')) map_h = Number(localStorage.getItem('map_h'));
 
   ui = QuickSettings.create(0, 0, "MagicGyver v1.0")
     .addFileChooser("Pick Image", "", "", handleFile)
-    .addRange('Width', 0, 900, cv_w, 10, resize_h)
-    .addRange('Height', 0, 700, cv_h, 10, resize_h)
+    .addRange('Width', 0, 900, map_w, 10, resize_h)
+    .addRange('Height', 0, 700, map_h, 10, resize_h)
 
     .addHTML("EDITOR", "")
-    .addRange('Size', 300, cv_w + 500, cv_w, 1, update_h)
+    .addRange('Size', 300, map_w + 500, map_w, 1, update_h)
     .addRange('Brightness', -128, 128, 0, 1, update_h)
     .addRange('Contrast', 0, 5.0, 1.0, 0.1, update_h)
     .addRange('Gamma', 1.0, 1.2, 0.0, 0.005, update_h)
@@ -70,6 +70,8 @@ function ui_init() {
     .addRange('Row amount', 0, 50, 20, 1, update_h)
     .addRange('Amplitude', 0, 3, 1, 0.1, update_h)
     .addBoolean('Loop', 1, update_h)
+    .addBoolean("Optimise", 0, update_h)
+    .addBoolean("Reverse", 0, update_h)
     .addRange('Skip', 1, 10, 5, 1, update_h)
 
     .addHTML("Status", "Idle")
@@ -90,6 +92,7 @@ function select_h() {
   ui.hideControl('Row amount');
   ui.hideControl('Loop');
   ui.hideControl('Skip');
+  ui.hideControl('Optimise');
 
   switch (ui_get('Trace').label) {
     case 'Waves':
@@ -99,6 +102,7 @@ function select_h() {
     case 'Crawl':
       ui.showControl('Loop');
       ui.showControl('Skip');
+      ui.showControl('Optimise');
       break;
   }
   update_h();
@@ -118,11 +122,11 @@ function update_h() {
 }
 function resize_h() {
   update_f = true;
-  cv_w = ui_get("Width");
-  cv_h = ui_get("Height");
-  localStorage.setItem('cv_w', cv_w);
-  localStorage.setItem('cv_h', cv_h);
-  resizeCanvas(cv_offs + cv_w + 10, cv_h * 2 + ui_padd * 2 + 10);
+  map_w = ui_get("Width");
+  map_h = ui_get("Height");
+  localStorage.setItem('map_w', map_w);
+  localStorage.setItem('map_h', map_h);
+  resizeCanvas(cv_offs + map_w + 10, map_h * 2 + ui_padd * 2 + 10);
 }
 
 // =============== MOUSE ===============
@@ -134,7 +138,7 @@ function ui_cursor() {
 function inCanvas() {
   let vx = mouseX - cv_offs;
   let vy = mouseY - ui_padd;
-  return (vx > 0 && vx < cv_w && vy > 0 && vy < cv_h);
+  return (vx > 0 && vx < map_w && vy > 0 && vy < map_h);
 }
 
 function mousePressed() {

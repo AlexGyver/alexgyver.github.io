@@ -1,6 +1,6 @@
 const cv_offs = 280;
-const cv_w = 900;
-const cv_h = 600;
+const map_w = 900;
+const map_h = 600;
 const ui_padd = 20;
 
 let nodes = [];
@@ -14,7 +14,7 @@ function setup() {
     .setDraggable(false)
     .setCollapsible(false);
 
-  createCanvas(cv_offs + cv_w + 10, cv_h + ui_padd + 10);
+  createCanvas(cv_offs + map_w + 10, map_h + ui_padd + 10);
 }
 
 function draw() {
@@ -38,7 +38,7 @@ function update_h() {
   noFill();
   stroke(0);
   //strokeWeight(2);
-  //rect(cv_offs, ui_padd, cv_w, cv_h);
+  //rect(cv_offs, ui_padd, map_w, map_h);
 
   strokeWeight(0.5);
   let nodes_am = ui.getValue("Nodes");

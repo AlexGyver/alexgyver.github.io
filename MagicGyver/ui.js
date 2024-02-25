@@ -80,7 +80,7 @@ function ui_init() {
       "<button class='qs_button' onclick='start()'>Start</button>&nbsp;" +
       "<button class='qs_button' onclick='stop()'>Stop</button>&nbsp;" +
       "<button class='qs_button' onclick='save_h()'>Save</button>&nbsp;" +
-      "<button class='qs_button' onclick='window.open(\"/viewer.html\", \"_blank\").focus()'>Viewer</button>")
+      "<button class='qs_button' onclick='window.open(window.location.href + \"viewer.html\", \"_blank\").focus()'>Viewer</button>")
 
     .setWidth(cv_offs - ui_padd)
     .setDraggable(false)

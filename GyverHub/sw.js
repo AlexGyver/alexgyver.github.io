@@ -1,10 +1,10 @@
-const CACHE_NAME = 'hub-cache-0.48b'
+const CACHE_NAME = 'hub-cache-0.55b'
 
 const CACHED_URLS = [
   
   '/',
   '/fa-solid-900.woff2',
-  '/PTSans-Narrow.woff2',
+  '/Robotocondensed.woff2',
   '/favicon.svg',
   '/index.html',
   '/script.js',

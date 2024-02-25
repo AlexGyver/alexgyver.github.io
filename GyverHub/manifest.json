@@ -5,7 +5,7 @@
     "start_url": ".",
     "name": "GyverHub",
     "short_name": "GyverHub",
-    "description": "ESP8266/32 controlling platform",
+    "description": "Arduino UI builder",
     "orientation": "portrait",
     "icons": [
         {

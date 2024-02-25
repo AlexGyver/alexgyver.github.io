@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>GyverHub v0.48b</title>
+  <title>GyverHub v0.55b</title>
   <link rel="icon" href="favicon.svg">
   <link rel="apple-touch-icon" href="favicon.svg">
   <meta name="description" content="Arduino/ESP8266/ESP32 Web Control Panel">
@@ -16,8 +16,9 @@
   <meta name="msapplication-navbutton-color" content="#37a93c">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="msapplication-starturl" content="/">
-  <script src="script.js?0.48b="></script>
-  <link href="style.css?0.48b=" rel="stylesheet">
+  <script src="script.js?0.55b="></script>
+  <link href="style.css?0.55b=" rel="stylesheet">
+  <script type="module" src="https://unpkg.com/esp-web-tools@9/dist/web/install-button.js?module"></script>
   <script type="text/javascript">
     (function (m, e, t, r, i, k, a) {
         m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
@@ -32,13 +33,5 @@
     <div><img src="https://mc.yandex.ru/watch/93507215" style="position:absolute; left:-9999px;" alt="" /></div>
   </noscript>
 </head>
-<body onresize="resize_h()">
-  <div id="notice" class="notice"></div>
-  <div class="head" id="head_cont"></div>
-  <div class="test" id="test_cont"></div>
-  <div class="projects" id="projects_cont"></div>
-  <div class="main" id="main_cont"></div>
-  <div class="cli" id="cli_cont"></div>
-  <div class="footer" id="footer_cont"></div>
-</body>
+<body onresize="resize_h()"></body>
 </html>

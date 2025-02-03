@@ -5,3 +5,4 @@
 - [WaterDance](https://alexgyver.github.io/WaterDance/)
 - [Bitmaper](https://alexgyver.github.io/Bitmaper/)
 - [OTA](https://alexgyver.github.io/OTA/)
+- [MIDI](https://alexgyver.github.io/MIDI/)

@@ -1,152 +1,115 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-  <title>AlexGyver Web Projects</title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="favicon.svg">
-  <link href="https://use.fontawesome.com/releases/v6.3.0/css/all.css" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlexGyver Web Projects</title>
 
-  <!-- Yandex.Metrika counter -->
-  <script type="text/javascript">
-    (function (m, e, t, r, i, k, a) {
-      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
-      m[i].l = 1 * new Date();
-      for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
-      k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
-    })
-      (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+        (function (m, e, t, r, i, k, a) {
+            m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+            m[i].l = 1 * new Date();
+            for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+            k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+        })
+            (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
 
-    ym(92861520, "init", {
-      clickmap: true,
-      trackLinks: true,
-      accurateTrackBounce: true
-    });
-  </script>
-  <noscript>
-    <div><img src="https://mc.yandex.ru/watch/92861520" style="position:absolute; left:-9999px;" alt="" /></div>
-  </noscript>
-  <!-- /Yandex.Metrika counter -->
+        ym(92861520, "init", {
+            clickmap: true,
+            trackLinks: true,
+            accurateTrackBounce: true
+        });
+    </script>
+    <noscript>
+        <div><img src="https://mc.yandex.ru/watch/92861520" style="position:absolute; left:-9999px;" alt="" /></div>
+    </noscript>
+    <!-- /Yandex.Metrika counter -->
 
+    <style>
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+        }
+
+        body {
+            position: relative;
+            display: grid;
+            place-items: center;
+            background-color: #1e6dbb;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+
+            --width: 1px;
+            --trans: 3px;
+            --size: 40px;
+            --white: #ffffff57;
+
+            background-image:
+                radial-gradient(circle at center,
+                    transparent 60%,
+                    rgba(0, 0, 0, 0.3) 100%),
+                repeating-linear-gradient(0deg,
+                    var(--white),
+                    var(--white) var(--width),
+                    transparent var(--trans),
+                    transparent var(--size)),
+                repeating-linear-gradient(90deg,
+                    var(--white),
+                    var(--white) var(--width),
+                    transparent var(--trans),
+                    transparent var(--size));
+        }
+
+        .main {
+            font-family: 'Comic Sans MS', 'Trebuchet MS', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .main a {
+            display: block;
+            width: auto;
+            box-sizing: border-box;
+            text-align: center;
+            font-weight: bold;
+            text-decoration: none;
+            text-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
+            color: white;
+            font-size: 40px;
+            border-radius: 15px;
+            border: 5px solid transparent;
+            padding: 2px 20px;
+        }
+
+        .main a:hover {
+            border-color: white;
+        }
+    </style>
 </head>
 
-<style>
-  .cont {
-    position: absolute;
-    left: 0;
-    right: 0;
-    margin-left: auto;
-    margin-right: auto;
-    max-width: 400px;
-    width: auto;
-    top: 100px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-bottom: 20px;
-    background-color: rgba(0, 0, 0, 0.404);
-    border-radius: 10px;
-  }
-
-  h1 {
-    color: white;
-    font-size: 28px;
-  }
-
-  body {
-    font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, serif;
-    background-color: rgb(100, 100, 100);
-    margin: 0;
-  }
-
-  span {
-    cursor: pointer;
-    display: block;
-    width: 200px;
-    padding: 10px;
-    margin: 5px;
-    background-color: rgb(0, 194, 0);
-    border-radius: 5px;
-    text-align: center;
-    font-weight: bold;
-  }
-
-  span:hover {
-    background-color: rgb(0, 155, 0);
-  }
-
-  a {
-    text-decoration: none;
-    color: rgb(0, 0, 0);
-    font-size: 23px;
-  }
-</style>
-
-<body style="background-color:rgb(100,100,100)">
-  <div class="cont">
-    <h1>AlexGyver.github.io</h1>
-    <span><a href="https://alexgyver.github.io/ota-projects/">AlexGyver OTA</a></span>
-    <span><a href="https://alexgyver.github.io/Bitmaper/">Bitmaper</a></span>
-    <span><a href="GyverHub/">GyverHub</a></span>
-    <span><a href="MagicGyver/">MagicGyver</a></span>
-    <span><a href="GyverBraid/">GyverBraid</a></span>
-    <span><a href="WaterDance/">WaterDance</a></span>
-    <span><a href="https://alexgyver.github.io/BallClockGen/">BallClockGen</a></span>
-    <span><a href="https://alexgyver.github.io/MIDI/">MIDI</a></span>
-    <span><a href="https://alexgyver.ru">alexgyver.ru</a></span>
-  </div>
-
-  <script>
-    let boxes = [];
-    let bsize = 60;
-    let amx, amy;
-    function setup() {
-      createCanvas(windowWidth, windowHeight, WEBGL);
-      stroke(0, 0, 0, 200);
-      strokeWeight(0.5);
-
-      rectMode(CENTER);
-      ortho(-width / 2, width / 2, -height / 2, height / 2, 10, 2000);
-      amx = Math.ceil(width / bsize + 1);
-      amy = Math.ceil(height / bsize + 1)
-      boxes = new Array(amx * amy).fill(400);
-      fill(110);
-    }
-
-    function draw() {
-      //orbitControl();
-      background(100);
-      directionalLight(255, 255, 255, -PI * 0.3, PI * 0.3, -PI * 0.6);
-      translate(0, -10, 250);
-      rotateX(-0.2);
-      rotateY(0.2);
-
-      for (let x = 0; x < width + bsize; x += bsize) {
-        for (let y = 0; y < height + bsize; y += bsize) {
-
-          let h = noise(frameCount * 0.01, x / width * 10, y / height * 10) * 10 * 25;
-          /*let xx = x/bsize;
-          let yy = y/bsize;
-          h = 400 + 200 * sin(sqrt(xx*xx+yy*yy)/1 + frameCount*0.03);*/
-
-          let offs = -35;
-          if (mouseX + offs >= x - bsize / 2 && mouseX + offs <= x + bsize / 2 &&
-            mouseY + offs >= y - bsize / 2 && mouseY + offs <= y + bsize / 2) {
-            h = 400;
-          }
-          let idx = Math.round(x / bsize + (width / bsize) * (y / bsize));
-          let k = boxes[idx] < h ? 0.4 : 0.02;
-          boxes[idx] += (h - boxes[idx]) * k;
-          push();
-          translate(-width / 2 + x, -height / 2 + y);
-          box(bsize, bsize, boxes[idx]);
-          pop();
-        }
-      }
-    }
-  </script>
-
+<body>
+    <div class="main">
+        <a href="https://alexgyver.github.io/ota-projects/">OTA</a>
+        <a href="https://alexgyver.github.io/Bitmaper/">Bitmaper</a>
+        <a href="https://alexgyver.github.io/Bitmaper2/">Bitmaper2</a>
+        <a href="https://alexgyver.github.io/MIDI/">MIDI</a>
+        <a href="GyverHub/">GyverHub</a>
+        <a href="MagicGyver/">MagicGyver</a>
+        <a href="GyverBraid/">GyverBraid</a>
+        <a href="WaterDance/">WaterDance</a>
+        <a href="https://alexgyver.github.io/BallClockGen/">BallClock Gen</a>
+    </div>
 </body>
 
 </html>
